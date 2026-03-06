@@ -1,0 +1,40 @@
+# NervOS — Ignore List
+
+# Build artifacts (large binaries — download/build locally)
+build/rootfs.ext4
+build/vmlinux
+build/bin/
+build/work/
+build/*.iso
+
+# Model weights
+models/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+*.egg
+
+# Secrets
+.env
+.env.*
+
+# Logs
+*.log
+.nervos/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build / Package
+*.tar.gz
+*.whl
+*.dist-info/

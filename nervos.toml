@@ -1,0 +1,38 @@
+# ============================================================
+# NervOS Sandbox Configuration
+# ============================================================
+# Most users need ZERO configuration. Just run:
+#   python -m nervos_server
+#
+# Only edit this file to customize resources or paths.
+# Environment variables (NERVOS_*) override these values.
+# ============================================================
+
+# ── VM Resources ──
+[vm]
+vcpu_count = 2              # CPU cores (1-32)
+mem_size_mib = 2048         # RAM in MiB
+
+# ── Paths (dev defaults — overridden by bootstrap at runtime) ──
+[paths]
+firecracker_bin = "/usr/local/bin/firecracker"
+kernel_path = "build/vmlinux"
+rootfs_path = "build/rootfs.ext4"
+
+# ── Timeouts ──
+[timeouts]
+health_timeout = 60         # Max seconds to wait for VM boot
+default_exec_timeout = 30   # Default command timeout
+max_exec_timeout = 300      # Max allowed command timeout
+
+# ── Safety ──
+[safety]
+enforce_safety = true       # Block rm -rf /, fork bombs, etc.
+
+# ── Network (only used with --network flag) ──
+# Without --network, communication uses vsock (zero config).
+# With --network, the VM gets internet access via TAP bridge.
+# [network]
+# vm_ip = "172.16.0.2"
+# host_ip = "172.16.0.1"
+# tap_device = "tap0"

@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nervos-sandbox"
+version = "0.1.0"
+description = "Hardware-isolated Linux sandbox for AI agents — Firecracker MicroVM + MCP"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{name = "Ashish"}]
+
+keywords = ["mcp", "sandbox", "firecracker", "ai", "agent", "microvm", "isolation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Emulators",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "mcp>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+]
+langgraph = [
+    "langchain-openai>=0.1.0",
+    "langgraph>=0.1.0",
+    "langchain-core>=0.1.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+nervos-sandbox = "nervos_server.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/AshishKumar/NervOS"
+Documentation = "https://github.com/AshishKumar/NervOS#readme"
+Issues = "https://github.com/AshishKumar/NervOS/issues"
+
+[tool.setuptools.packages.find]
+include = ["nervos_server*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
