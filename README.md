@@ -1,5 +1,9 @@
 # NervOS
 
+Run AI agent code inside a Firecracker microVM instead of your host machine.
+
+NervOS provides a lightweight sandbox for AI agents executing arbitrary code.
+
 > Give your AI agent a computer. Isolated. Instant. Self-hosted.
 
 NervOS is a tiny operating system that boots in **2 seconds** and gives AI agents a safe, isolated Linux machine to work in. Install it with one command. No Docker. No cloud. No config files.
