@@ -79,21 +79,27 @@ class BunkerVMToolkit:
             Use this to execute any bash command, run scripts, install packages, etc.
             The sandbox is a full Linux environment with Python, network access, and
             a real filesystem — but hardware-isolated from the host."""
+            logger.info("\u2192 run_command: %s", command[:120])
             r = client.exec(command, timeout=timeout)
             stdout = r.get("stdout", "")
             stderr = r.get("stderr", "")
             exit_code = r.get("exit_code", -1)
+            duration = r.get("duration_ms", 0)
             output = stdout
             if stderr:
                 output += f"\n[stderr] {stderr}" if output else stderr
             if exit_code != 0:
                 output += f"\n[exit_code: {exit_code}]"
+            logger.info("  \u2190 %s (%dms, %d bytes)",
+                        "OK" if exit_code == 0 else f"EXIT {exit_code}",
+                        duration, len(stdout))
             return output or "(no output)"
 
         @langchain_tool
         def write_file(path: str, content: str) -> str:
             """Write a file inside the secure BunkerVM sandbox.
             Creates parent directories automatically. Use absolute paths like /tmp/script.py."""
+            logger.info("\u2192 write_file: %s (%d bytes)", path, len(content))
             r = client.write_file(path, content)
             bytes_written = r.get("bytes_written", 0)
             return f"Wrote {bytes_written} bytes to {path}"
@@ -101,12 +107,14 @@ class BunkerVMToolkit:
         @langchain_tool
         def read_file(path: str) -> str:
             """Read the contents of a file from the BunkerVM sandbox."""
+            logger.info("\u2192 read_file: %s", path)
             r = client.read_file(path)
             return r.get("content", "(empty file)")
 
         @langchain_tool
         def list_directory(path: str = "/") -> str:
             """List files and directories at a path in the BunkerVM sandbox."""
+            logger.info("\u2192 list_directory: %s", path)
             r = client.list_dir(path)
             entries = r.get("entries", [])
             if not entries:

@@ -106,6 +106,8 @@ def sandbox_exec(
     safety = classify_command(command)
     timeout = max(1, min(timeout, 300))
 
+    logger.info("\u2192 sandbox_exec: %s", command[:120])
+
     audit.log(
         "exec",
         command=command,
@@ -160,10 +162,13 @@ def sandbox_exec(
     safety_tag = f"[{safety['level'].upper()}]" if safety["level"] != SafetyLevel.READ else ""
     if timed_out:
         parts.append(f"[TIMEOUT after {timeout}s] {safety_tag}")
+        logger.warning("  \u2190 sandbox_exec TIMEOUT: %s", command[:80])
     elif exit_code == 0:
         parts.append(f"[OK] {safety_tag} ({duration:.0f}ms)")
+        logger.info("  \u2190 sandbox_exec OK (%dms, %d bytes)", duration, len(stdout))
     else:
         parts.append(f"[EXIT {exit_code}] {safety_tag} ({duration:.0f}ms)")
+        logger.info("  \u2190 sandbox_exec EXIT %d (%dms)", exit_code, duration)
 
     if stdout:
         parts.append(stdout)
@@ -194,6 +199,8 @@ def sandbox_read_file(path: str) -> str:
     """
     client = _get_client()
     audit = _get_audit()
+
+    logger.info("\u2192 sandbox_read_file: %s", path)
 
     audit.log("read_file", path=path)
 
@@ -235,6 +242,8 @@ def sandbox_write_file(path: str, content: str, append: bool = False) -> str:
     audit = _get_audit()
 
     mode = "append" if append else "overwrite"
+    logger.info("\u2192 sandbox_write_file: %s (%d bytes, %s)", path, len(content), mode)
+
     audit.log("write_file", path=path, content_length=len(content), mode=mode)
 
     try:
@@ -264,6 +273,8 @@ def sandbox_list_dir(path: str = "/") -> str:
         Formatted directory listing.
     """
     client = _get_client()
+
+    logger.info("\u2192 sandbox_list_dir: %s", path)
 
     try:
         result = client.list_dir(path)
@@ -302,6 +313,8 @@ def sandbox_status() -> str:
     disk usage, load average, and process count.
     """
     client = _get_client()
+
+    logger.info("\u2192 sandbox_status")
 
     try:
         status = client.status()
@@ -364,6 +377,7 @@ def sandbox_reset() -> str:
     """
     audit = _get_audit()
     audit.log("sandbox_reset")
+    logger.info("\u2192 sandbox_reset")
 
     if _vm_manager is None:
         return (
