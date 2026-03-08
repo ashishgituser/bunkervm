@@ -35,7 +35,7 @@ BUNDLE_DIR = BUNKERVM_HOME / "bundle"
 META_FILE = BUNDLE_DIR / "bundle.json"
 
 # GitHub release config
-GITHUB_REPO = "ashishgituser/BunkerVM"
+GITHUB_REPO = "ashishgituser/bunkervm"
 BUNDLE_FILENAME = "bunkervm-bundle-x86_64.tar.gz"
 
 # Expected files in the bundle

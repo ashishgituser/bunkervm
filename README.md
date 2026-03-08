@@ -133,8 +133,8 @@ The pre-built bundle (~100MB) includes Firecracker, a Linux kernel, and the root
 
 ```bash
 # Clone
-git clone https://github.com/ashishgituser/BunkerVM.git
-cd BunkerVM
+git clone https://github.com/ashishgituser/bunkervm.git
+cd bunkervm
 
 # Build the micro-OS locally (needs Linux/WSL2 + sudo)
 sudo bash build/setup-firecracker.sh    # Download Firecracker + kernel

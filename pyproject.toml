@@ -45,9 +45,9 @@ langgraph = [
 bunkervm = "bunkervm.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/ashishgituser/BunkerVM"
-Documentation = "https://github.com/ashishgituser/BunkerVM#readme"
-Issues = "https://github.com/ashishgituser/BunkerVM/issues"
+Homepage = "https://github.com/ashishgituser/bunkervm"
+Documentation = "https://github.com/ashishgituser/bunkervm#readme"
+Issues = "https://github.com/ashishgituser/bunkervm/issues"
 
 [tool.setuptools.packages.find]
 include = ["bunkervm*"]
