@@ -62,9 +62,10 @@ jobs:
           ARCH="x86_64"
           FC_MINOR="${FC_VERSION%.*}"  # v1.11.0 -> v1.11
           
-          # Try the CI bucket first
+          # Try the CI bucket first (exclude .config files)
           KERNEL_KEY=$(curl -s "http://spec.ccfc.min.s3.amazonaws.com/?prefix=firecracker-ci/${FC_MINOR}/${ARCH}/vmlinux-&list-type=2" \
             | grep -oP '(?<=<Key>)(firecracker-ci/[^<]+vmlinux-[0-9][^<]*)' \
+            | grep -v '\.config$' \
             | sort -V | tail -1)
           
           if [ -n "$KERNEL_KEY" ]; then

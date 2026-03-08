@@ -44,6 +44,7 @@ else
     
     KERNEL_KEY=$(curl -s "http://spec.ccfc.min.s3.amazonaws.com/?prefix=firecracker-ci/${FC_MINOR}/${ARCH}/vmlinux-&list-type=2" \
       | grep -oP '(?<=<Key>)(firecracker-ci/[^<]+vmlinux-[0-9][^<]*)' \
+      | grep -v '\.config$' \
       | sort -V | tail -1)
     
     if [ -n "$KERNEL_KEY" ]; then
