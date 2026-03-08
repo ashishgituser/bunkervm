@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NervOS Exec Agent — Lightweight command execution server.
+BunkerVM Exec Agent — Lightweight command execution server.
 
 Runs INSIDE the Firecracker MicroVM. Accepts HTTP requests from
 the host-side MCP server to execute commands, read/write files,
@@ -52,7 +52,7 @@ class ExecHandler(http.server.BaseHTTPRequestHandler):
     """HTTP request handler for sandbox operations."""
 
     protocol_version = "HTTP/1.1"
-    server_version = "NervOS-ExecAgent/1.0"
+    server_version = "BunkerVM-ExecAgent/1.0"
 
     # ── Response helpers ──
 
@@ -77,7 +77,7 @@ class ExecHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             if self.path == "/health":
-                self._send_json(200, {"status": "ok", "agent": "nervos-exec", "version": "1.0"})
+                self._send_json(200, {"status": "ok", "agent": "bunkervm-exec", "version": "1.0"})
             elif self.path == "/status":
                 self._handle_status()
             else:
@@ -418,7 +418,7 @@ def main():
     # Always start TCP server (used by init health check + fallback)
     tcp_server = ThreadedHTTPServer((LISTEN_HOST, LISTEN_PORT), ExecHandler)
     servers.append(("TCP", f"{LISTEN_HOST}:{LISTEN_PORT}", tcp_server))
-    sys.stderr.write(f"NervOS exec agent listening on TCP {LISTEN_HOST}:{LISTEN_PORT}\n")
+    sys.stderr.write(f"BunkerVM exec agent listening on TCP {LISTEN_HOST}:{LISTEN_PORT}\n")
 
     # Start VSOCK server if kernel supports it
     vsock_ok = False
@@ -427,7 +427,7 @@ def main():
             vsock_server = VsockHTTPServer(VSOCK_PORT, ExecHandler)
             servers.append(("VSOCK", f"CID_ANY:{VSOCK_PORT}", vsock_server))
             vsock_ok = True
-            sys.stderr.write(f"NervOS exec agent listening on VSOCK port {VSOCK_PORT}\n")
+            sys.stderr.write(f"BunkerVM exec agent listening on VSOCK port {VSOCK_PORT}\n")
         except Exception as e:
             sys.stderr.write(f"VSOCK setup failed ({e}), using TCP only\n")
     else:

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-NervOS Dynamic Executor — the OS itself is the tool.
+BunkerVM Dynamic Executor — the OS itself is the tool.
 
 No hardcoded tools. The model outputs shell commands, we execute them
 and return stdout/stderr. The model interprets results and decides
-what to do next. Any command the OS supports, NervOS can run.
+what to do next. Any command the OS supports, BunkerVM can run.
 """
 
 import subprocess

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# NervOS — Build SANDBOX rootfs for Firecracker MicroVM
+# BunkerVM — Build SANDBOX rootfs for Firecracker MicroVM
 # ============================================================
 # Creates a lightweight Alpine Linux rootfs for MCP sandbox mode.
 # NO model, NO llama-server — just Python + exec_agent.py.
@@ -21,12 +21,12 @@ WIN_PROJECT_DIR="$PROJECT_DIR"
 
 ROOTFS_IMG="$WIN_PROJECT_DIR/build/rootfs.ext4"
 ROOTFS_SIZE_MB=512
-MOUNT_DIR="/tmp/nervos-rootfs-mount"
+MOUNT_DIR="/tmp/bunkervm-rootfs-mount"
 ALPINE_MIRROR="http://dl-cdn.alpinelinux.org/alpine/v3.21"
 ALPINE_MINIROOTFS="$ALPINE_MIRROR/releases/x86_64/alpine-minirootfs-3.21.3-x86_64.tar.gz"
 
 echo "============================================"
-echo " NervOS Sandbox Rootfs Builder"
+echo " BunkerVM Sandbox Rootfs Builder"
 echo "============================================"
 echo " Mode: Sandbox (MCP server backend)"
 echo " Size: ${ROOTFS_SIZE_MB}MB (no model, no LLM)"
@@ -35,7 +35,7 @@ echo ""
 # ── Verify prerequisites ──
 echo "[1/6] Checking prerequisites..."
 
-EXEC_AGENT="$WIN_PROJECT_DIR/rootfs/nervos/exec_agent.py"
+EXEC_AGENT="$WIN_PROJECT_DIR/rootfs/bunkervm/exec_agent.py"
 INIT_SCRIPT="$WIN_PROJECT_DIR/rootfs/init"
 
 for f in "$EXEC_AGENT" "$INIT_SCRIPT"; do
@@ -51,7 +51,7 @@ echo ""
 echo "[2/6] Creating ext4 image (${ROOTFS_SIZE_MB}MB)..."
 rm -f "$ROOTFS_IMG"
 dd if=/dev/zero of="$ROOTFS_IMG" bs=1M count=$ROOTFS_SIZE_MB status=progress
-mkfs.ext4 -F -L nervos-root "$ROOTFS_IMG"
+mkfs.ext4 -F -L bunkervm-root "$ROOTFS_IMG"
 
 # ── Mount image ──
 echo ""
@@ -108,20 +108,20 @@ sudo chroot "$MOUNT_DIR" /bin/sh -c "
 "
 echo "  ✓ Packages installed"
 
-# ── Install NervOS agent ──
+# ── Install BunkerVM agent ──
 echo ""
-echo "[6/6] Installing NervOS sandbox agent..."
+echo "[6/6] Installing BunkerVM sandbox agent..."
 
 # Create directories
-sudo mkdir -p "$MOUNT_DIR/nervos"
+sudo mkdir -p "$MOUNT_DIR/bunkervm"
 sudo mkdir -p "$MOUNT_DIR/var/log"
 sudo mkdir -p "$MOUNT_DIR/root"
-sudo mkdir -p "$MOUNT_DIR/etc/nervos"
+sudo mkdir -p "$MOUNT_DIR/etc/bunkervm"
 
 # Copy exec agent
-sudo cp "$WIN_PROJECT_DIR/rootfs/nervos/exec_agent.py" "$MOUNT_DIR/nervos/"
-sudo sed -i 's/\r$//' "$MOUNT_DIR/nervos/exec_agent.py"
-sudo chmod +x "$MOUNT_DIR/nervos/exec_agent.py"
+sudo cp "$WIN_PROJECT_DIR/rootfs/bunkervm/exec_agent.py" "$MOUNT_DIR/bunkervm/"
+sudo sed -i 's/\r$//' "$MOUNT_DIR/bunkervm/exec_agent.py"
+sudo chmod +x "$MOUNT_DIR/bunkervm/exec_agent.py"
 
 # Copy init
 sudo cp "$WIN_PROJECT_DIR/rootfs/init" "$MOUNT_DIR/init"
@@ -130,17 +130,17 @@ sudo chmod +x "$MOUNT_DIR/init"
 
 # Also copy standalone mode files (init auto-detects)
 for f in orchestrator.py tools.py system_prompt.txt; do
-    if [ -f "$WIN_PROJECT_DIR/rootfs/nervos/$f" ]; then
-        sudo cp "$WIN_PROJECT_DIR/rootfs/nervos/$f" "$MOUNT_DIR/nervos/"
-        sudo sed -i 's/\r$//' "$MOUNT_DIR/nervos/$f"
+    if [ -f "$WIN_PROJECT_DIR/rootfs/bunkervm/$f" ]; then
+        sudo cp "$WIN_PROJECT_DIR/rootfs/bunkervm/$f" "$MOUNT_DIR/bunkervm/"
+        sudo sed -i 's/\r$//' "$MOUNT_DIR/bunkervm/$f"
     fi
 done
 
 # Set sandbox mode
-echo "sandbox" | sudo tee "$MOUNT_DIR/etc/nervos/mode" > /dev/null
+echo "sandbox" | sudo tee "$MOUNT_DIR/etc/bunkervm/mode" > /dev/null
 
 # Set hostname
-echo "nervos-sandbox" | sudo tee "$MOUNT_DIR/etc/hostname" > /dev/null
+echo "bunkervm-sandbox" | sudo tee "$MOUNT_DIR/etc/hostname" > /dev/null
 
 echo "  ✓ Agent installed"
 
@@ -162,4 +162,4 @@ echo ""
 echo "  Next steps:"
 echo "    1. sudo bash scripts/setup-network.sh"
 echo "    2. pip install -e ."
-echo "    3. python -m nervos_server"
+echo "    3. python -m bunkervm"

@@ -1,4 +1,4 @@
-# NervOS — Ignore List
+# BunkerVM — Ignore List
 
 # Build artifacts (large binaries — download/build locally)
 build/rootfs.ext4
@@ -24,7 +24,7 @@ dist/
 
 # Logs
 *.log
-.nervos/
+.bunkervm/
 
 # OS / IDE
 .DS_Store

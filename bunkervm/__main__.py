@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-NervOS MCP Server — Entry point.
+BunkerVM MCP Server — Entry point.
 
 Usage:
-  python -m nervos_server                    # Boots VM with internet. Needs sudo.
-  python -m nervos_server --transport sse    # SSE transport (remote/web clients)
-  python -m nervos_server --no-network       # Offline mode (no internet in VM)
-  python -m nervos_server --skip-vm          # VM already running externally
-  python -m nervos_server --help
+  python -m bunkervm                    # Boots VM with internet. Needs sudo.
+  python -m bunkervm --transport sse    # SSE transport (remote/web clients)
+  python -m bunkervm --no-network       # Offline mode (no internet in VM)
+  python -m bunkervm --skip-vm          # VM already running externally
+  python -m bunkervm --help
 
 Claude Desktop config (claude_desktop_config.json):
   {
     "mcpServers": {
-      "nervos": {
+      "bunkervm": {
         "command": "wsl",
-        "args": ["-d", "Ubuntu", "--", "sudo", "python3", "-m", "nervos_server"]
+        "args": ["-d", "Ubuntu", "--", "sudo", "python3", "-m", "bunkervm"]
       }
     }
   }
@@ -30,8 +30,8 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="nervos-sandbox",
-        description="NervOS — Hardware-isolated sandbox for AI agents",
+        prog="bunkervm",
+        description="BunkerVM — Hardware-isolated sandbox for AI agents",
     )
     parser.add_argument(
         "--transport", choices=["stdio", "sse"], default="stdio",
@@ -43,7 +43,7 @@ def main():
     )
     parser.add_argument(
         "--config", default=None,
-        help="Path to nervos.toml config file",
+        help="Path to bunkervm.toml config file",
     )
     parser.add_argument(
         "--no-network", action="store_true",
@@ -73,7 +73,7 @@ def main():
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         stream=sys.stderr,
     )
-    logger = logging.getLogger("nervos")
+    logger = logging.getLogger("bunkervm")
 
     # ── Load config ──
     from .config import load_config
@@ -90,7 +90,7 @@ def main():
     network = not args.no_network
     audit.log("server_start", transport=args.transport, network=network)
 
-    # ── Bootstrap: ensure NervOS bundle is ready ──
+    # ── Bootstrap: ensure BunkerVM bundle is ready ──
     if not args.skip_vm:
         from .bootstrap import ensure_ready
 
@@ -141,7 +141,7 @@ def main():
     set_globals(client=client, audit=audit, vm_manager=vm, config=config)
     server = create_server()
 
-    logger.info("NervOS MCP server ready (transport: %s)", args.transport)
+    logger.info("BunkerVM MCP server ready (transport: %s)", args.transport)
     audit.log("server_ready", transport=args.transport)
 
     if args.transport == "sse":

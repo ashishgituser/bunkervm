@@ -1,11 +1,11 @@
 # ============================================================
-# NervOS Sandbox Configuration
+# BunkerVM Sandbox Configuration
 # ============================================================
 # Most users need ZERO configuration. Just run:
-#   python -m nervos_server
+#   python -m bunkervm
 #
 # Only edit this file to customize resources or paths.
-# Environment variables (NERVOS_*) override these values.
+# Environment variables (BUNKERVM_*) override these values.
 # ============================================================
 
 # ── VM Resources ──

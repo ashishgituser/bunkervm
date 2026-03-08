@@ -1,5 +1,5 @@
 """
-NervOS MCP Server — Tool definitions.
+BunkerVM MCP Server — Tool definitions.
 
 Exposes sandbox operations as MCP tools that any AI model can call.
 Each tool routes to the exec agent running inside the Firecracker MicroVM.
@@ -21,13 +21,13 @@ from mcp.server.fastmcp import FastMCP
 
 from .safety import classify_command, SafetyLevel
 
-logger = logging.getLogger("nervos.mcp")
+logger = logging.getLogger("bunkervm.mcp")
 
 # ── Global state (set by __main__.py before server starts) ──
 _client = None       # SandboxClient
 _audit = None        # AuditLogger
 _vm_manager = None   # VMManager (optional)
-_config = None       # NervOSConfig
+_config = None       # BunkerVMConfig
 
 
 def set_globals(client, audit, vm_manager=None, config=None):
@@ -59,7 +59,7 @@ def create_server() -> FastMCP:
 # ── MCP Server ──
 
 mcp = FastMCP(
-    "nervos-sandbox",
+    "bunkervm",
     instructions=(
         "Hardware-isolated Linux sandbox powered by Firecracker MicroVM. "
         "Execute shell commands, read/write files, and manage a secure "
@@ -123,7 +123,7 @@ def sandbox_exec(
             f"Command: {command}\n\n"
             f"The sandbox blocks commands that could destroy the VM's ability to function. "
             f"You can still run most commands. If you need this specific operation, "
-            f"ask the user to disable safety enforcement in nervos.toml."
+            f"ask the user to disable safety enforcement in bunkervm.toml."
         )
 
     # Execute

@@ -1,12 +1,12 @@
 """
-NervOS Bootstrap — Zero-config first-run setup.
+BunkerVM Bootstrap — Zero-config first-run setup.
 
-On first run, automatically downloads the pre-built NervOS bundle:
+On first run, automatically downloads the pre-built BunkerVM bundle:
   - firecracker (static binary)
   - vmlinux (Linux kernel)
-  - rootfs.ext4 (NervOS micro-OS — Alpine + Python + exec_agent)
+  - rootfs.ext4 (BunkerVM micro-OS — Alpine + Python + exec_agent)
 
-Everything goes into ~/.nervos/. Users never touch build scripts.
+Everything goes into ~/.bunkervm/. Users never touch build scripts.
 
     from .bootstrap import ensure_ready
     paths = ensure_ready()  # Downloads if needed, returns paths
@@ -26,17 +26,17 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-logger = logging.getLogger("nervos.bootstrap")
+logger = logging.getLogger("bunkervm.bootstrap")
 
 # ── Constants ──
 
-NERVOS_HOME = Path.home() / ".nervos"
-BUNDLE_DIR = NERVOS_HOME / "bundle"
+BUNKERVM_HOME = Path.home() / ".bunkervm"
+BUNDLE_DIR = BUNKERVM_HOME / "bundle"
 META_FILE = BUNDLE_DIR / "bundle.json"
 
 # GitHub release config
-GITHUB_REPO = "AshishKumar/NervOS"
-BUNDLE_FILENAME = "nervos-bundle-x86_64.tar.gz"
+GITHUB_REPO = "ashishgituser/BunkerVM"
+BUNDLE_FILENAME = "bunkervm-bundle-x86_64.tar.gz"
 
 # Expected files in the bundle
 REQUIRED_FILES = {
@@ -48,7 +48,7 @@ REQUIRED_FILES = {
 
 @dataclass
 class BundlePaths:
-    """Paths to the NervOS bundle components."""
+    """Paths to the BunkerVM bundle components."""
     firecracker: str
     kernel: str
     rootfs: str
@@ -60,7 +60,7 @@ class BundlePaths:
 
 
 def ensure_ready(version: Optional[str] = None, force: bool = False) -> BundlePaths:
-    """Ensure NervOS bundle is downloaded and ready.
+    """Ensure BunkerVM bundle is downloaded and ready.
 
     This is the main entry point. Call it before starting the VM.
     On first run, downloads everything automatically.
@@ -80,7 +80,7 @@ def ensure_ready(version: Optional[str] = None, force: bool = False) -> BundlePa
         return paths
 
     # First run — need to download
-    _print_status("NervOS first-run setup...")
+    _print_status("BunkerVM first-run setup...")
 
     # Check prerequisites
     _check_prerequisites()
@@ -92,7 +92,7 @@ def ensure_ready(version: Optional[str] = None, force: bool = False) -> BundlePa
     if _download_bundle(version):
         paths = _get_paths()
         if paths.ready:
-            _print_status("NervOS ready! VM will boot in ~2 seconds.\n")
+            _print_status("BunkerVM ready! VM will boot in ~2 seconds.\n")
             return paths
 
     # Fallback: check if files exist in the project's build/ dir (dev mode)
@@ -103,7 +103,7 @@ def ensure_ready(version: Optional[str] = None, force: bool = False) -> BundlePa
 
     # Nothing worked
     raise RuntimeError(
-        "NervOS bundle not found.\n\n"
+        "BunkerVM bundle not found.\n\n"
         "Options:\n"
         f"  1. Download a release from: https://github.com/{GITHUB_REPO}/releases\n"
         f"     Extract to: {BUNDLE_DIR}\n\n"
@@ -119,7 +119,7 @@ def _get_paths() -> BundlePaths:
         firecracker=str(BUNDLE_DIR / REQUIRED_FILES["firecracker"]),
         kernel=str(BUNDLE_DIR / REQUIRED_FILES["kernel"]),
         rootfs=str(BUNDLE_DIR / REQUIRED_FILES["rootfs"]),
-        home=str(NERVOS_HOME),
+        home=str(BUNKERVM_HOME),
     )
 
 
@@ -127,7 +127,7 @@ def _check_prerequisites() -> None:
     """Verify the host can run Firecracker."""
     arch = platform.machine()
     if arch not in ("x86_64", "amd64", "AMD64"):
-        _print_status(f"Warning: NervOS is built for x86_64, detected {arch}")
+        _print_status(f"Warning: BunkerVM is built for x86_64, detected {arch}")
 
     # Check if we're on Linux (or WSL)
     if sys.platform != "linux":
@@ -158,11 +158,11 @@ def _download_bundle(version: Optional[str] = None) -> bool:
             # Latest release
             url = f"https://github.com/{GITHUB_REPO}/releases/latest/download/{BUNDLE_FILENAME}"
 
-        _print_status(f"Downloading NervOS bundle (~100MB)...")
+        _print_status(f"Downloading BunkerVM bundle (~100MB)...")
         _print_status(f"  From: {url}")
 
         # Download to temp file
-        tmp_path = NERVOS_HOME / f".{BUNDLE_FILENAME}.tmp"
+        tmp_path = BUNKERVM_HOME / f".{BUNDLE_FILENAME}.tmp"
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -208,7 +208,7 @@ def _download_bundle(version: Optional[str] = None) -> bool:
 
 def _download_with_progress(url: str, dest: str) -> None:
     """Download a file with progress indication."""
-    req = urllib.request.Request(url, headers={"User-Agent": "NervOS-Bootstrap/0.1"})
+    req = urllib.request.Request(url, headers={"User-Agent": "BunkerVM-Bootstrap/0.1"})
     response = urllib.request.urlopen(req, timeout=120)
 
     total = int(response.headers.get("Content-Length", 0))
@@ -236,12 +236,12 @@ def _try_dev_mode() -> Optional[BundlePaths]:
     """Check if bundle files exist in the project build/ directory (dev mode).
 
     This allows contributors who build locally to skip the download.
-    Files are symlinked (or copied) into ~/.nervos/bundle/ for consistency.
+    Files are symlinked (or copied) into ~/.bunkervm/bundle/ for consistency.
     """
-    # Find project root by looking for nervos.toml
+    # Find project root by looking for bunkervm.toml
     candidates = [
         Path.cwd(),
-        Path(__file__).parent.parent,  # nervos_server/../
+        Path(__file__).parent.parent,  # bunkervm/../
     ]
 
     for project_root in candidates:

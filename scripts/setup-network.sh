@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# NervOS — TAP Network Setup
+# BunkerVM — TAP Network Setup
 # ============================================================
 # Creates the TAP device for Firecracker VM networking.
 # Run ONCE before starting the MCP server (requires sudo).
@@ -20,7 +20,7 @@ HOST_IP="${HOST_IP:-172.16.0.1}"
 SUBNET="${SUBNET:-24}"
 ENABLE_NAT="${ENABLE_NAT:-true}"
 
-echo "NervOS Network Setup"
+echo "BunkerVM Network Setup"
 echo "  TAP device: $TAP"
 echo "  Host IP:    $HOST_IP/$SUBNET"
 echo ""
@@ -63,4 +63,4 @@ echo "  IP:      172.16.0.2/$SUBNET"
 echo "  Gateway: $HOST_IP"
 echo ""
 echo "Start the MCP server with:"
-echo "  python -m nervos_server"
+echo "  python -m bunkervm"

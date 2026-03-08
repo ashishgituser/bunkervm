@@ -2,8 +2,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-NERVOS_DIR="$(dirname "$SCRIPT_DIR")"
-BUILD_DIR="$NERVOS_DIR/build"
+BUNKERVM_DIR="$(dirname "$SCRIPT_DIR")"
+BUILD_DIR="$BUNKERVM_DIR/build"
 mkdir -p "$BUILD_DIR"
 
 # ===== Step 1: Install Firecracker =====

@@ -1,13 +1,13 @@
 """
-NervOS Configuration — TOML-based configuration with sensible defaults.
+BunkerVM Configuration — TOML-based configuration with sensible defaults.
 
 Loads settings from (in order of precedence):
   1. CLI arguments (highest)
-  2. Environment variables (NERVOS_*)
-  3. nervos.toml config file
+  2. Environment variables (BUNKERVM_*)
+  3. bunkervm.toml config file
   4. Built-in defaults (lowest)
 
-All paths are resolved relative to the project root (location of nervos.toml).
+All paths are resolved relative to the project root (location of bunkervm.toml).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger("nervos.config")
+logger = logging.getLogger("bunkervm.config")
 
 # ── Defaults ──
 
@@ -30,15 +30,15 @@ _DEFAULTS = {
 
     # VSOCK (default transport — zero config)
     "vsock_cid": 3,
-    "vsock_uds_path": "/tmp/nervos-vsock.sock",
+    "vsock_uds_path": "/tmp/bunkervm-vsock.sock",
     "vm_port": 8080,    # Port inside VM (both vsock and TCP)
 
-    # Paths (auto-provisioned into ~/.nervos/bundle/ on first run)
-    "firecracker_bin": "~/.nervos/bundle/firecracker",
-    "kernel_path": "~/.nervos/bundle/vmlinux",
-    "rootfs_path": "~/.nervos/bundle/rootfs.ext4",
-    "rootfs_work_path": "/tmp/nervos-sandbox-rootfs.ext4",
-    "socket_path": "/tmp/nervos-fc.sock",
+    # Paths (auto-provisioned into ~/.bunkervm/bundle/ on first run)
+    "firecracker_bin": "~/.bunkervm/bundle/firecracker",
+    "kernel_path": "~/.bunkervm/bundle/vmlinux",
+    "rootfs_path": "~/.bunkervm/bundle/rootfs.ext4",
+    "rootfs_work_path": "/tmp/bunkervm-sandbox-rootfs.ext4",
+    "socket_path": "/tmp/bunkervm-fc.sock",
 
     # TAP networking (optional — only with --network flag)
     "vm_ip": "172.16.0.2",
@@ -48,7 +48,7 @@ _DEFAULTS = {
     "guest_mac": "AA:FC:00:00:00:01",
 
     # Audit & logging
-    "audit_log_path": "~/.nervos/logs/audit.jsonl",
+    "audit_log_path": "~/.bunkervm/logs/audit.jsonl",
 
     # Timeouts
     "health_timeout": 60,
@@ -65,8 +65,8 @@ _DEFAULTS = {
 
 
 @dataclass
-class NervOSConfig:
-    """Validated NervOS configuration."""
+class BunkerVMConfig:
+    """Validated BunkerVM configuration."""
 
     # VM resources
     vcpu_count: int = _DEFAULTS["vcpu_count"]
@@ -117,17 +117,17 @@ class NervOSConfig:
         return os.path.join(self.project_root, path)
 
 
-def load_config(config_path: Optional[str] = None) -> NervOSConfig:
+def load_config(config_path: Optional[str] = None) -> BunkerVMConfig:
     """Load configuration from TOML file, env vars, and defaults.
 
     Args:
-        config_path: Explicit path to nervos.toml. If None, searches
+        config_path: Explicit path to bunkervm.toml. If None, searches
                      current directory and parent directories.
 
     Returns:
-        Validated NervOSConfig instance.
+        Validated BunkerVMConfig instance.
     """
-    config = NervOSConfig()
+    config = BunkerVMConfig()
 
     # Find config file
     toml_path = _find_config(config_path)
@@ -143,7 +143,7 @@ def load_config(config_path: Optional[str] = None) -> NervOSConfig:
     # Override with environment variables
     _apply_env(config)
 
-    # Resolve relative paths (expand ~ for ~/.nervos/ paths)
+    # Resolve relative paths (expand ~ for ~/.bunkervm/ paths)
     config.firecracker_bin = os.path.expanduser(config.firecracker_bin)
     config.kernel_path = config.resolve_path(os.path.expanduser(config.kernel_path))
     config.rootfs_path = config.resolve_path(os.path.expanduser(config.rootfs_path))
@@ -156,7 +156,7 @@ def load_config(config_path: Optional[str] = None) -> NervOSConfig:
 
 
 def _find_config(explicit_path: Optional[str]) -> Optional[str]:
-    """Find the nervos.toml config file."""
+    """Find the bunkervm.toml config file."""
     if explicit_path:
         if os.path.exists(explicit_path):
             return explicit_path
@@ -166,7 +166,7 @@ def _find_config(explicit_path: Optional[str]) -> Optional[str]:
     # Search current directory and parents
     current = os.getcwd()
     for _ in range(5):  # Max 5 levels up
-        candidate = os.path.join(current, "nervos.toml")
+        candidate = os.path.join(current, "bunkervm.toml")
         if os.path.exists(candidate):
             return candidate
         parent = os.path.dirname(current)
@@ -278,7 +278,7 @@ def _parse_value(value: str):
     return value
 
 
-def _apply_toml(config: NervOSConfig, data: dict) -> None:
+def _apply_toml(config: BunkerVMConfig, data: dict) -> None:
     """Apply TOML data to config, handling sections."""
     # Flat keys at top level
     for key, value in data.items():
@@ -290,7 +290,7 @@ def _apply_toml(config: NervOSConfig, data: dict) -> None:
             _set_config_value(config, key, value)
 
 
-def _set_config_value(config: NervOSConfig, key: str, value) -> None:
+def _set_config_value(config: BunkerVMConfig, key: str, value) -> None:
     """Set a config attribute if it exists."""
     if hasattr(config, key):
         expected_type = type(getattr(config, key))
@@ -302,24 +302,24 @@ def _set_config_value(config: NervOSConfig, key: str, value) -> None:
         logger.debug("Unknown config key: %s", key)
 
 
-def _apply_env(config: NervOSConfig) -> None:
-    """Override config with NERVOS_* environment variables."""
+def _apply_env(config: BunkerVMConfig) -> None:
+    """Override config with BUNKERVM_* environment variables."""
     env_map = {
-        "NERVOS_VM_IP": "vm_ip",
-        "NERVOS_VM_PORT": "vm_port",
-        "NERVOS_HOST_IP": "host_ip",
-        "NERVOS_TAP_DEVICE": "tap_device",
-        "NERVOS_FIRECRACKER_BIN": "firecracker_bin",
-        "NERVOS_KERNEL_PATH": "kernel_path",
-        "NERVOS_ROOTFS_PATH": "rootfs_path",
-        "NERVOS_SOCKET_PATH": "socket_path",
-        "NERVOS_AUDIT_LOG": "audit_log_path",
-        "NERVOS_VCPU_COUNT": "vcpu_count",
-        "NERVOS_MEM_SIZE_MIB": "mem_size_mib",
-        "NERVOS_HEALTH_TIMEOUT": "health_timeout",
-        "NERVOS_ENFORCE_SAFETY": "enforce_safety",
-        "NERVOS_TRANSPORT": "transport",
-        "NERVOS_SSE_PORT": "sse_port",
+        "BUNKERVM_VM_IP": "vm_ip",
+        "BUNKERVM_VM_PORT": "vm_port",
+        "BUNKERVM_HOST_IP": "host_ip",
+        "BUNKERVM_TAP_DEVICE": "tap_device",
+        "BUNKERVM_FIRECRACKER_BIN": "firecracker_bin",
+        "BUNKERVM_KERNEL_PATH": "kernel_path",
+        "BUNKERVM_ROOTFS_PATH": "rootfs_path",
+        "BUNKERVM_SOCKET_PATH": "socket_path",
+        "BUNKERVM_AUDIT_LOG": "audit_log_path",
+        "BUNKERVM_VCPU_COUNT": "vcpu_count",
+        "BUNKERVM_MEM_SIZE_MIB": "mem_size_mib",
+        "BUNKERVM_HEALTH_TIMEOUT": "health_timeout",
+        "BUNKERVM_ENFORCE_SAFETY": "enforce_safety",
+        "BUNKERVM_TRANSPORT": "transport",
+        "BUNKERVM_SSE_PORT": "sse_port",
     }
 
     for env_var, config_key in env_map.items():
@@ -329,7 +329,7 @@ def _apply_env(config: NervOSConfig) -> None:
             logger.debug("Config override from env: %s=%s", env_var, value)
 
 
-def _validate(config: NervOSConfig) -> None:
+def _validate(config: BunkerVMConfig) -> None:
     """Validate configuration values."""
     if config.vcpu_count < 1 or config.vcpu_count > 32:
         logger.warning("vcpu_count=%d is unusual (expected 1-32)", config.vcpu_count)

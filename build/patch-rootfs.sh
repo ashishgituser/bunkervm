@@ -5,7 +5,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT="$(dirname "$SCRIPT_DIR")"
 ROOTFS="$PROJECT/build/rootfs.ext4"
-MNT="/tmp/nervos-fix"
+MNT="/tmp/bunkervm-fix"
 
 umount "$MNT" 2>/dev/null || true
 mkdir -p "$MNT"
@@ -19,21 +19,21 @@ sed -i 's/\r$//' "$MNT/init"
 chmod +x "$MNT/init"
 echo "  ✓ /init"
 
-# Ensure /nervos and /etc/nervos directories exist
-mkdir -p "$MNT/nervos"
-mkdir -p "$MNT/etc/nervos"
+# Ensure /bunkervm and /etc/bunkervm directories exist
+mkdir -p "$MNT/bunkervm"
+mkdir -p "$MNT/etc/bunkervm"
 
 # Force sandbox mode (MCP server mode — no model needed)
-echo "sandbox" > "$MNT/etc/nervos/mode"
-echo "  ✓ /etc/nervos/mode = sandbox"
+echo "sandbox" > "$MNT/etc/bunkervm/mode"
+echo "  ✓ /etc/bunkervm/mode = sandbox"
 
 # Update agent files (standalone + sandbox)
 for f in orchestrator.py tools.py system_prompt.txt exec_agent.py; do
-    if [ -f "$PROJECT/rootfs/nervos/$f" ]; then
-        cp "$PROJECT/rootfs/nervos/$f" "$MNT/nervos/$f"
-        sed -i 's/\r$//' "$MNT/nervos/$f"
-        chmod +x "$MNT/nervos/$f"
-        echo "  ✓ /nervos/$f"
+    if [ -f "$PROJECT/rootfs/bunkervm/$f" ]; then
+        cp "$PROJECT/rootfs/bunkervm/$f" "$MNT/bunkervm/$f"
+        sed -i 's/\r$//' "$MNT/bunkervm/$f"
+        chmod +x "$MNT/bunkervm/$f"
+        echo "  ✓ /bunkervm/$f"
     fi
 done
 

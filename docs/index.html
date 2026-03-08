@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NervOS — Hardware-Isolated Sandbox for AI Agents</title>
+    <title>BunkerVM — Hardware-Isolated Sandbox for AI Agents</title>
     <meta name="description" content="Give your AI agent its own virtual machine. Self-hosted, hardware-isolated, boots in seconds.">
-    <meta property="og:title" content="NervOS — Hardware-Isolated Sandbox for AI Agents">
+    <meta property="og:title" content="BunkerVM — Hardware-Isolated Sandbox for AI Agents">
     <meta property="og:description" content="Give your AI agent its own virtual machine. Self-hosted, hardware-isolated, boots in seconds.">
     <meta property="og:type" content="website">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -783,12 +783,12 @@
     <!-- Nav -->
     <nav id="navbar">
         <div class="container">
-            <a href="#" class="logo">NervOS</a>
+            <a href="#" class="logo">BunkerVM</a>
             <div class="nav-links">
                 <a href="#architecture" class="hide-mobile">Architecture</a>
                 <a href="#tools" class="hide-mobile">Tools</a>
                 <a href="#setup">Setup</a>
-                <a href="https://github.com/ashishgituser/NervOS" target="_blank" class="cta">GitHub &#8599;</a>
+                <a href="https://github.com/ashishgituser/BunkerVM" target="_blank" class="cta">GitHub &#8599;</a>
             </div>
         </div>
     </nav>
@@ -817,7 +817,7 @@
                     <div class="terminal-dot r"></div>
                     <div class="terminal-dot y"></div>
                     <div class="terminal-dot g"></div>
-                    <span class="terminal-title">nervos-sandbox</span>
+                    <span class="terminal-title">bunkervm</span>
                 </div>
                 <div class="terminal-body" id="terminal-body">
                     <!-- Lines injected by JS -->
@@ -825,7 +825,7 @@
             </div>
 
             <div class="hero-buttons reveal reveal-delay-4">
-                <a href="https://github.com/ashishgituser/NervOS" class="btn btn-glow" target="_blank">
+                <a href="https://github.com/ashishgituser/BunkerVM" class="btn btn-glow" target="_blank">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
                     View on GitHub
                 </a>
@@ -859,7 +859,7 @@
         <div class="container">
             <div class="section-label reveal">Architecture</div>
             <h2 class="reveal">How the agent connects</h2>
-            <p class="section-desc reveal">Your AI talks to NervOS over MCP. NervOS boots a Firecracker MicroVM and relays commands over vsock. The agent never touches your host.</p>
+            <p class="section-desc reveal">Your AI talks to BunkerVM over MCP. BunkerVM boots a Firecracker MicroVM and relays commands over vsock. The agent never touches your host.</p>
 
             <div class="arch-flow reveal">
                 <div class="arch-node">
@@ -876,7 +876,7 @@
 
                 <div class="arch-node">
                     <div class="arch-node-icon">&#9881;&#65039;</div>
-                    <h4>nervos_server</h4>
+                    <h4>bunkervm</h4>
                     <p>Host process</p>
                 </div>
 
@@ -946,7 +946,7 @@
 
             <div class="comparison reveal">
                 <div class="compare-col highlight">
-                    <h3>NervOS <span class="tag tag-vm">MicroVM</span></h3>
+                    <h3>BunkerVM <span class="tag tag-vm">MicroVM</span></h3>
                     <div class="compare-item"><span class="icon-check">&#10003;</span> Separate kernel — hardware boundary</div>
                     <div class="compare-item"><span class="icon-check">&#10003;</span> Near-zero escape risk</div>
                     <div class="compare-item"><span class="icon-check">&#10003;</span> pip install — done</div>
@@ -970,7 +970,7 @@
         <div class="container">
             <div class="section-label reveal">Setup</div>
             <h2 class="reveal">Claude Desktop config</h2>
-            <p class="section-desc reveal">Add this to your config file. On first run, NervOS downloads the micro-OS automatically.</p>
+            <p class="section-desc reveal">Add this to your config file. On first run, BunkerVM downloads the micro-OS automatically.</p>
 
             <div class="setup-cards reveal">
                 <div class="setup-card">
@@ -980,12 +980,12 @@
                     </div>
                     <pre>{
   <span class="key">"mcpServers"</span>: {
-    <span class="key">"nervos"</span>: {
+    <span class="key">"bunkervm"</span>: {
       <span class="key">"command"</span>: <span class="str">"wsl"</span>,
       <span class="key">"args"</span>: [<span class="str">"-d"</span>, <span class="str">"Ubuntu"</span>,
         <span class="str">"--"</span>, <span class="str">"sudo"</span>,
         <span class="str">"python3"</span>, <span class="str">"-m"</span>,
-        <span class="str">"nervos_server"</span>]
+        <span class="str">"bunkervm"</span>]
     }
   }
 }</pre>
@@ -997,11 +997,11 @@
                     </div>
                     <pre>{
   <span class="key">"mcpServers"</span>: {
-    <span class="key">"nervos"</span>: {
+    <span class="key">"bunkervm"</span>: {
       <span class="key">"command"</span>: <span class="str">"sudo"</span>,
       <span class="key">"args"</span>: [<span class="str">"python3"</span>,
         <span class="str">"-m"</span>,
-        <span class="str">"nervos_server"</span>]
+        <span class="str">"bunkervm"</span>]
     }
   }
 }</pre>
@@ -1015,7 +1015,7 @@
         <div class="container">
             <div class="section-label reveal">Compatibility</div>
             <h2 class="reveal">Works with any MCP client</h2>
-            <p class="section-desc reveal">NervOS speaks the <a href="https://modelcontextprotocol.io" target="_blank" style="color: var(--accent-light); text-decoration: none;">Model Context Protocol</a>.</p>
+            <p class="section-desc reveal">BunkerVM speaks the <a href="https://modelcontextprotocol.io" target="_blank" style="color: var(--accent-light); text-decoration: none;">Model Context Protocol</a>.</p>
 
             <div class="compat-row reveal">
                 <div class="compat-chip"><span class="chip-dot"></span> Claude Desktop</div>
@@ -1061,7 +1061,7 @@
             <h2 class="reveal">Ready to isolate your agents?</h2>
             <p class="reveal">One command to install. One config to connect.</p>
             <div class="hero-buttons reveal">
-                <a href="https://github.com/ashishgituser/NervOS" class="btn btn-glow" target="_blank">
+                <a href="https://github.com/ashishgituser/BunkerVM" class="btn btn-glow" target="_blank">
                     Get Started on GitHub &#8599;
                 </a>
             </div>
@@ -1071,11 +1071,11 @@
     <!-- Footer -->
     <footer>
         <div class="container">
-            <p>&copy; 2026 NervOS &mdash; <a href="https://github.com/ashishgituser/NervOS/blob/main/LICENSE" target="_blank">AGPL-3.0</a></p>
+            <p>&copy; 2026 BunkerVM &mdash; <a href="https://github.com/ashishgituser/BunkerVM/blob/main/LICENSE" target="_blank">AGPL-3.0</a></p>
             <div class="footer-links">
-                <a href="https://github.com/ashishgituser/NervOS" target="_blank">GitHub</a>
-                <a href="https://github.com/ashishgituser/NervOS/issues" target="_blank">Issues</a>
-                <a href="https://github.com/ashishgituser/NervOS#readme" target="_blank">Docs</a>
+                <a href="https://github.com/ashishgituser/BunkerVM" target="_blank">GitHub</a>
+                <a href="https://github.com/ashishgituser/BunkerVM/issues" target="_blank">Issues</a>
+                <a href="https://github.com/ashishgituser/BunkerVM#readme" target="_blank">Docs</a>
             </div>
         </div>
     </footer>
@@ -1099,10 +1099,10 @@
 
         // ── Terminal typing animation ──
         const termLines = [
-            { type: 'cmd', prompt: '$ ', text: 'pip install nervos-sandbox' },
-            { type: 'output', text: 'Successfully installed nervos-sandbox-0.1.0' },
-            { type: 'cmd', prompt: '$ ', text: 'nervos-sandbox' },
-            { type: 'info', text: '⚡ Downloading NervOS bundle (first run)...' },
+            { type: 'cmd', prompt: '$ ', text: 'pip install bunkervm' },
+            { type: 'output', text: 'Successfully installed bunkervm-0.1.0' },
+            { type: 'cmd', prompt: '$ ', text: 'bunkervm' },
+            { type: 'info', text: '⚡ Downloading BunkerVM bundle (first run)...' },
             { type: 'success', text: '✓ Bundle ready (~100MB)' },
             { type: 'info', text: '⚡ Booting Firecracker MicroVM...' },
             { type: 'success', text: '✓ VM ready in 5.2s' },

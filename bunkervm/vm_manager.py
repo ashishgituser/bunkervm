@@ -1,5 +1,5 @@
 """
-NervOS VM Manager — Firecracker MicroVM lifecycle management.
+BunkerVM VM Manager — Firecracker MicroVM lifecycle management.
 
 Handles:
   - Firecracker process start/stop/restart
@@ -30,7 +30,7 @@ import tempfile
 import time
 from typing import Optional
 
-logger = logging.getLogger("nervos.vm")
+logger = logging.getLogger("bunkervm.vm")
 
 
 class VMError(Exception):
@@ -44,7 +44,7 @@ class VMManager:
     Default mode (vsock + TAP):
         vm = VMManager(config)
         vm.start()              # Sets up TAP, boots VM with vsock + internet
-        # host talks to VM via /tmp/nervos-vsock.sock
+        # host talks to VM via /tmp/bunkervm-vsock.sock
 
     Offline mode (vsock only, no internet in VM):
         vm = VMManager(config, network=False)
@@ -332,7 +332,7 @@ class VMManager:
                 "host_dev_name": self.config.tap_device,
             }]
 
-        fd, path = tempfile.mkstemp(prefix="nervos-vm-", suffix=".json")
+        fd, path = tempfile.mkstemp(prefix="bunkervm-vm-", suffix=".json")
         with os.fdopen(fd, "w") as f:
             json.dump(config, f, indent=2)
         self._config_path = path

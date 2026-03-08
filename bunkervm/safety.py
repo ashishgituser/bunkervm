@@ -1,5 +1,5 @@
 """
-NervOS Safety Classifier — Regex-based command risk assessment.
+BunkerVM Safety Classifier — Regex-based command risk assessment.
 
 Classifies shell commands into safety levels before execution.
 This is a defense-in-depth measure — the VM itself is the primary
@@ -64,7 +64,7 @@ _BLOCKED_PATTERNS = [
     (re.compile(r'kill\s+-9\s+.*python', re.I), "Killing Python would stop the exec agent"),
     (re.compile(r'pkill\s+.*python', re.I), "Killing Python would stop the exec agent"),
     (re.compile(r':\(\)\s*\{\s*:\|:\s*&\s*\}\s*;', re.I), "Fork bomb detected"),
-    (re.compile(r'rm\s+.*\b(exec_agent|nervos)\b', re.I), "Deleting the exec agent"),
+    (re.compile(r'rm\s+.*\b(exec_agent|bunkervm)\b', re.I), "Deleting the exec agent"),
 ]
 
 _DESTRUCTIVE_PATTERNS = [

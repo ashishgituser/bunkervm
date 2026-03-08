@@ -5,7 +5,7 @@ import socket, json, sys
 def vsock_req(method, path, body=None):
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(30)
-    s.connect("/tmp/nervos-vsock.sock")
+    s.connect("/tmp/bunkervm-vsock.sock")
     s.sendall(b"CONNECT 8080\n")
     resp = s.recv(256)
     if b"OK" not in resp:
@@ -54,17 +54,17 @@ def t_health():
     assert r.get("status") == "ok", f"Expected ok, got {r}"
 
 def t_exec():
-    r = vsock_req("POST", "/exec", {"command": "echo Hello from NervOS!"})
+    r = vsock_req("POST", "/exec", {"command": "echo Hello from BunkerVM!"})
     assert r.get("exit_code") == 0, f"exit_code={r.get('exit_code')}"
-    assert "Hello from NervOS" in r.get("stdout", ""), f"stdout={r.get('stdout')}"
+    assert "Hello from BunkerVM" in r.get("stdout", ""), f"stdout={r.get('stdout')}"
 
 def t_write_file():
-    r = vsock_req("POST", "/write-file", {"path": "/tmp/test.txt", "content": "NervOS works!"})
+    r = vsock_req("POST", "/write-file", {"path": "/tmp/test.txt", "content": "BunkerVM works!"})
     assert "error" not in r, f"error={r.get('error')}"
 
 def t_read_file():
     r = vsock_req("POST", "/read-file", {"path": "/tmp/test.txt"})
-    assert r.get("content", "").strip() == "NervOS works!", f"content={r.get('content')}"
+    assert r.get("content", "").strip() == "BunkerVM works!", f"content={r.get('content')}"
 
 def t_status():
     r = vsock_req("GET", "/status")
@@ -80,7 +80,7 @@ def t_list_dir():
     r = vsock_req("POST", "/exec", {"command": "ls /tmp/test.txt"})
     assert r.get("exit_code") == 0
 
-print("NervOS Smoke Test")
+print("BunkerVM Smoke Test")
 print("=" * 40)
 
 test("health", t_health)

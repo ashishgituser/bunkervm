@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-NervOS + LangGraph Integration Test
+BunkerVM + LangGraph Integration Test
 
-Demonstrates using NervOS MCP sandbox as a tool within a LangGraph agent.
+Demonstrates using BunkerVM MCP sandbox as a tool within a LangGraph agent.
 The agent gets a task, reasons about it, and executes code inside the
 hardware-isolated Firecracker MicroVM via vsock.
 
 Prerequisites:
   pip install langchain-openai langgraph langchain-core
-  # NervOS VM must be running (or use --skip-vm with external VM)
+  # BunkerVM VM must be running (or use --skip-vm with external VM)
 
 Usage:
-  # Start NervOS (boots VM automatically):
-  sudo python -m nervos_server &
+  # Start BunkerVM (boots VM automatically):
+  sudo python -m bunkervm &
 
   # Set your API key
   export OPENAI_API_KEY=sk-...
@@ -21,7 +21,7 @@ Usage:
   python tests/test_langgraph.py
 
 Architecture:
-  LangGraph Agent (Claude) → tool calls → NervOS sandbox client → vsock → Firecracker VM
+  LangGraph Agent (Claude) → tool calls → BunkerVM sandbox client → vsock → Firecracker VM
 """
 
 from __future__ import annotations
@@ -63,11 +63,11 @@ if not LLM_AVAILABLE:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# NervOS Sandbox Client (direct vsock — no MCP server needed)
+# BunkerVM Sandbox Client (direct vsock — no MCP server needed)
 # ═══════════════════════════════════════════════════════════════════
 
-VSOCK_UDS = os.environ.get("NERVOS_VSOCK_UDS", "/tmp/nervos-vsock.sock")
-VSOCK_PORT = int(os.environ.get("NERVOS_VSOCK_PORT", "8080"))
+VSOCK_UDS = os.environ.get("BUNKERVM_VSOCK_UDS", "/tmp/bunkervm-vsock.sock")
+VSOCK_PORT = int(os.environ.get("BUNKERVM_VSOCK_PORT", "8080"))
 
 
 def _update_vsock_uds(path: str):
@@ -125,7 +125,7 @@ def _vsock_request(method: str, path: str, body: dict | None = None) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# LangGraph Tools — Backed by NervOS Sandbox
+# LangGraph Tools — Backed by BunkerVM Sandbox
 # ═══════════════════════════════════════════════════════════════════
 
 @tool
@@ -246,7 +246,7 @@ When writing code:
 
 
 def create_agent():
-    """Build the LangGraph agent with NervOS sandbox tools."""
+    """Build the LangGraph agent with BunkerVM sandbox tools."""
 
     # Select LLM
     if LLM_AVAILABLE == "openai":
@@ -295,7 +295,7 @@ def create_agent():
 # ═══════════════════════════════════════════════════════════════════
 
 SCENARIOS = {
-    "hello": "Say hello by running 'echo Hello from NervOS sandbox!'",
+    "hello": "Say hello by running 'echo Hello from BunkerVM sandbox!'",
 
     "sysinfo": (
         "Check the sandbox status, then get detailed system information: "
@@ -310,7 +310,7 @@ SCENARIOS = {
 
     "webserver": (
         "Create a simple Python HTTP server script at /root/server.py that "
-        "responds with JSON {\"message\": \"Hello from NervOS\", \"timestamp\": <current_unix_time>}. "
+        "responds with JSON {\"message\": \"Hello from BunkerVM\", \"timestamp\": <current_unix_time>}. "
         "Start it in the background on port 9090, then use curl to test it, "
         "and finally kill the server."
     ),
@@ -376,7 +376,7 @@ def run_scenario(agent, name: str, task: str):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="NervOS + LangGraph Integration Test")
+    parser = argparse.ArgumentParser(description="BunkerVM + LangGraph Integration Test")
     parser.add_argument(
         "scenario",
         nargs="?",
@@ -387,7 +387,7 @@ def main():
     parser.add_argument(
         "--vsock-uds",
         default=VSOCK_UDS,
-        help="Path to Firecracker vsock UDS (default: /tmp/nervos-vsock.sock)",
+        help="Path to Firecracker vsock UDS (default: /tmp/bunkervm-vsock.sock)",
     )
     parser.add_argument(
         "--custom",
@@ -401,16 +401,16 @@ def main():
     _update_vsock_uds(args.vsock_uds)
 
     print("╔══════════════════════════════════════════╗")
-    print("║  NervOS + LangGraph Integration Test     ║")
+    print("║  BunkerVM + LangGraph Integration Test   ║")
     print("╚══════════════════════════════════════════╝")
     print()
 
     # Check connectivity
     print("Checking sandbox connectivity...")
     if not test_connectivity():
-        print("\nERROR: Cannot connect to NervOS sandbox VM.")
+        print("\nERROR: Cannot connect to BunkerVM sandbox VM.")
         print("Make sure the VM is running:")
-        print("  sudo python -m nervos_server")
+        print("  sudo python -m bunkervm")
         sys.exit(1)
 
     # Check LLM API key

@@ -1,5 +1,5 @@
 """
-NervOS Sandbox Client — Connects to the exec agent inside the VM.
+BunkerVM Sandbox Client — Connects to the exec agent inside the VM.
 
 Transport priority:
   1. VSOCK via Firecracker UDS (zero network config — default)
@@ -24,7 +24,7 @@ import socket
 import time
 from typing import Optional
 
-logger = logging.getLogger("nervos.sandbox")
+logger = logging.getLogger("bunkervm.sandbox")
 
 # Default timeouts
 _CONNECT_TIMEOUT = 5       # seconds to wait for connection
@@ -57,7 +57,7 @@ class SandboxClient:
 
     Usage:
         # VSOCK mode (default — no network config needed):
-        client = SandboxClient(vsock_uds="/tmp/nervos-vsock.sock", vsock_port=8080)
+        client = SandboxClient(vsock_uds="/tmp/bunkervm-vsock.sock", vsock_port=8080)
 
         # TCP mode (when VM has TAP networking):
         client = SandboxClient(host="172.16.0.2", port=8080)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NervOS Orchestrator — Dynamic AI-native OS agent.
+BunkerVM Orchestrator — Dynamic AI-native OS agent.
 
 Architecture:
   llama-server (:8080)  <-->  orchestrator.py  <-->  shell (any command)
@@ -23,14 +23,14 @@ import time
 import urllib.request
 import urllib.error
 
-NERVOS_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, NERVOS_DIR)
+BUNKERVM_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BUNKERVM_DIR)
 
 from tools import execute
 
 # Configuration
 LLAMA_URL = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")
-SYSTEM_PROMPT_FILE = os.path.join(NERVOS_DIR, "system_prompt.txt")
+SYSTEM_PROMPT_FILE = os.path.join(BUNKERVM_DIR, "system_prompt.txt")
 
 # Colors
 C_RESET = "\033[0m"
@@ -170,25 +170,25 @@ def run_agent_loop():
         {"role": "assistant", "content": '{"reply":"You have 2GB RAM total, 1.8GB free."}'},
         {"role": "user", "content": "list files in /"},
         {"role": "assistant", "content": '{"cmd":"ls -la /"}'},
-        {"role": "user", "content": '[output]\ntotal 68\ndrwxr-xr-x  18 root root  4096 Mar  1 nervos\ndrwxr-xr-x   2 root root  4096 Mar  1 bin\ndrwxr-xr-x   3 root root  4096 Mar  1 etc\n[/output]\nNow summarize the result for the user as {"reply":"..."}'},
-        {"role": "assistant", "content": '{"reply":"Root directory contains: nervos/, bin/, etc/ and more."}'},
+        {"role": "user", "content": '[output]\ntotal 68\ndrwxr-xr-x  18 root root  4096 Mar  1 bunkervm\ndrwxr-xr-x   2 root root  4096 Mar  1 bin\ndrwxr-xr-x   3 root root  4096 Mar  1 etc\n[/output]\nNow summarize the result for the user as {"reply":"..."}'},
+        {"role": "assistant", "content": '{"reply":"Root directory contains: bunkervm/, bin/, etc/ and more."}'},
         {"role": "user", "content": "hello"},
-        {"role": "assistant", "content": '{"reply":"Hello! I am NervOS, your AI operating system. Ask me to check hardware, run commands, manage files, or anything else."}'},
+        {"role": "assistant", "content": '{"reply":"Hello! I am BunkerVM, your AI operating system. Ask me to check hardware, run commands, manage files, or anything else."}'},
     ]
 
     messages = [{"role": "system", "content": system_prompt}] + few_shot
 
     while True:
         try:
-            user_input = input(f"{C_GREEN}nervos>{C_RESET} ").strip()
+            user_input = input(f"{C_GREEN}bunkervm>{C_RESET} ").strip()
         except (EOFError, KeyboardInterrupt):
-            print(f"\n{C_YELLOW}Shutting down NervOS...{C_RESET}")
+            print(f"\n{C_YELLOW}Shutting down BunkerVM...{C_RESET}")
             break
 
         if not user_input:
             continue
         if user_input.lower() in ("exit", "quit", "shutdown", "poweroff"):
-            print(f"{C_YELLOW}NervOS shutting down...{C_RESET}")
+            print(f"{C_YELLOW}BunkerVM shutting down...{C_RESET}")
             break
 
         messages.append({"role": "user", "content": user_input})

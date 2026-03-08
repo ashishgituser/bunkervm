@@ -1,6 +1,6 @@
 #!/bin/sh
 # ============================================================
-# NervOS — PID 1 Init for Firecracker MicroVM
+# BunkerVM — PID 1 Init for Firecracker MicroVM
 # ============================================================
 # Direct kernel boot → this runs as PID 1. No systemd.
 #
@@ -9,7 +9,7 @@
 #   SANDBOX    — Boots exec_agent.py for MCP server use
 #
 # Mode detection:
-#   1. /etc/nervos/mode file ("standalone" or "sandbox")
+#   1. /etc/bunkervm/mode file ("standalone" or "sandbox")
 #   2. Auto-detect: model + llama-server present → standalone
 #   3. Default: sandbox
 # ============================================================
@@ -31,30 +31,30 @@ export HOME=/root
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export PYTHONDONTWRITEBYTECODE=1
 
-hostname nervos
-echo "nervos" > /proc/sys/kernel/hostname
+hostname bunkervm
+echo "bunkervm" > /proc/sys/kernel/hostname
 
 # ── Phase 2: Kernel tuning ──
 echo 1 > /proc/sys/vm/overcommit_memory 2>/dev/null || true
 
 # ── Phase 3: Detect mode ──
-NERVOS_DIR="/nervos"
+BUNKERVM_DIR="/bunkervm"
 MODEL_PATH="/models/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 LLAMA_SERVER="/usr/bin/llama-server"
 LLAMA_PORT=8080
 EXEC_AGENT_PORT=8080
 
 # Explicit mode override
-if [ -f /etc/nervos/mode ]; then
-    NERVOS_MODE=$(cat /etc/nervos/mode | tr -d '[:space:]')
+if [ -f /etc/bunkervm/mode ]; then
+    BUNKERVM_MODE=$(cat /etc/bunkervm/mode | tr -d '[:space:]')
 fi
 
 # Auto-detect if not set
-if [ -z "$NERVOS_MODE" ]; then
+if [ -z "$BUNKERVM_MODE" ]; then
     if [ -f "$MODEL_PATH" ] && [ -f "$LLAMA_SERVER" ]; then
-        NERVOS_MODE="standalone"
+        BUNKERVM_MODE="standalone"
     else
-        NERVOS_MODE="sandbox"
+        BUNKERVM_MODE="sandbox"
     fi
 fi
 
@@ -64,7 +64,7 @@ ip link set lo up 2>/dev/null || true
 if [ -d /sys/class/net/eth0 ]; then
     ip link set eth0 up 2>/dev/null || true
 
-    if [ "$NERVOS_MODE" = "sandbox" ]; then
+    if [ "$BUNKERVM_MODE" = "sandbox" ]; then
         # Sandbox mode: static IP only if TAP is present (--network flag).
         # Default vsock mode has no eth0, so this block only runs
         # when the user explicitly requested networking.
@@ -82,14 +82,14 @@ fi
 
 # ── Boot banner ──
 echo ""
-if [ "$NERVOS_MODE" = "sandbox" ]; then
+if [ "$BUNKERVM_MODE" = "sandbox" ]; then
     echo "  ╔══════════════════════════════════════╗"
-    echo "  ║    NervOS • Sandbox MicroVM          ║"
+    echo "  ║    BunkerVM • Sandbox MicroVM        ║"
     echo "  ║    Mode: MCP Sandbox                 ║"
     echo "  ╚══════════════════════════════════════╝"
 else
     echo "  ╔══════════════════════════════════════╗"
-    echo "  ║     NervOS • AI-Native MicroVM       ║"
+    echo "  ║     BunkerVM • AI-Native MicroVM     ║"
     echo "  ║     Mode: Standalone                 ║"
     echo "  ╚══════════════════════════════════════╝"
 fi
@@ -97,17 +97,17 @@ echo ""
 
 BOOT_TIME=$(cat /proc/uptime | cut -d' ' -f1)
 echo "  Kernel → init: ${BOOT_TIME}s"
-echo "  Mode: $NERVOS_MODE"
+echo "  Mode: $BUNKERVM_MODE"
 
 # ================================================================
 # SANDBOX MODE — Start exec agent for MCP server
 # ================================================================
-if [ "$NERVOS_MODE" = "sandbox" ]; then
+if [ "$BUNKERVM_MODE" = "sandbox" ]; then
     echo ""
 
     # Verify exec agent exists
-    if [ ! -f "$NERVOS_DIR/exec_agent.py" ]; then
-        echo "  ERROR: Missing $NERVOS_DIR/exec_agent.py"
+    if [ ! -f "$BUNKERVM_DIR/exec_agent.py" ]; then
+        echo "  ERROR: Missing $BUNKERVM_DIR/exec_agent.py"
         echo "  Dropping to rescue shell..."
         exec /bin/sh
     fi
@@ -121,7 +121,7 @@ if [ "$NERVOS_MODE" = "sandbox" ]; then
 
     # Start exec agent (listens on both vsock + TCP localhost)
     echo "  Starting exec agent..."
-    cd "$NERVOS_DIR"
+    cd "$BUNKERVM_DIR"
     python3 exec_agent.py &
     AGENT_PID=$!
 
@@ -162,7 +162,7 @@ fi
 
 # ── Verify critical files ──
 BOOT_OK=1
-for f in "$LLAMA_SERVER" "$MODEL_PATH" "$NERVOS_DIR/orchestrator.py"; do
+for f in "$LLAMA_SERVER" "$MODEL_PATH" "$BUNKERVM_DIR/orchestrator.py"; do
     if [ ! -f "$f" ]; then
         echo "  ERROR: Missing $f"
         BOOT_OK=0
@@ -217,11 +217,11 @@ for i in $(seq 1 120); do
 done
 echo ""
 
-# ── Launch NervOS Agent ──
+# ── Launch BunkerVM Agent ──
 export LLAMA_URL="http://127.0.0.1:${LLAMA_PORT}"
-export NERVOS_DIR
+export BUNKERVM_DIR
 
-cd "$NERVOS_DIR"
+cd "$BUNKERVM_DIR"
 
 if command -v python3 >/dev/null 2>&1; then
     python3 orchestrator.py

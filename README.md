@@ -1,4 +1,4 @@
-# NervOS
+# BunkerVM
 
 Run AI agent code inside a Firecracker microVM instead of your host machine.
 
@@ -6,12 +6,12 @@ NervOS provides a lightweight sandbox for AI agents executing arbitrary code.
 
 > Give your AI agent a computer. Isolated. Instant. Self-hosted.
 
-NervOS is a tiny operating system that boots in **2 seconds** and gives AI agents a safe, isolated Linux machine to work in. Install it with one command. No Docker. No cloud. No config files.
+BunkerVM is a tiny operating system that boots in **2 seconds** and gives AI agents a safe, isolated Linux machine to work in. Install it with one command. No Docker. No cloud. No config files.
 
 ## Install
 
 ```
-pip install nervos-sandbox
+pip install bunkervm
 ```
 
 ## Use with Claude Desktop
@@ -22,9 +22,9 @@ Add this to your Claude Desktop config:
 ```json
 {
   "mcpServers": {
-    "nervos": {
+    "bunkervm": {
       "command": "wsl",
-      "args": ["-d", "Ubuntu", "--", "sudo", "python3", "-m", "nervos_server"]
+      "args": ["-d", "Ubuntu", "--", "sudo", "python3", "-m", "bunkervm"]
     }
   }
 }
@@ -34,15 +34,15 @@ Add this to your Claude Desktop config:
 ```json
 {
   "mcpServers": {
-    "nervos": {
+    "bunkervm": {
       "command": "sudo",
-      "args": ["python3", "-m", "nervos_server"]
+      "args": ["python3", "-m", "bunkervm"]
     }
   }
 }
 ```
 
-That's it. On first run, NervOS downloads a ~100MB pre-built micro-OS. After that, every launch boots a fresh VM in ~2 seconds.
+That's it. On first run, BunkerVM downloads a ~100MB pre-built micro-OS. After that, every launch boots a fresh VM in ~2 seconds.
 
 ## What can it do?
 
@@ -61,7 +61,7 @@ Once connected, your AI agent gets these tools:
 
 ## Why not Docker?
 
-| | NervOS | Docker |
+| | BunkerVM | Docker |
 |---|---|---|
 | Isolation | **Hardware (KVM)** — separate kernel | Shared kernel |
 | Escape risk | Near zero | Container escapes exist |
@@ -70,7 +70,7 @@ Once connected, your AI agent gets these tools:
 | Internet access | Optional | Yes |
 | Setup | `pip install` | Dockerfile + build + run |
 
-NervOS runs each agent in a real virtual machine. If the agent goes rogue, it can't touch your host.
+BunkerVM runs each agent in a real virtual machine. If the agent goes rogue, it can't touch your host.
 
 ## Requirements
 
@@ -86,14 +86,14 @@ nestedVirtualization=true
 
 ## Works with any MCP client
 
-NervOS speaks the [Model Context Protocol](https://modelcontextprotocol.io). It works with:
+BunkerVM speaks the [Model Context Protocol](https://modelcontextprotocol.io). It works with:
 - Claude Desktop
 - LangGraph / LangChain
 - Any MCP-compatible agent framework
 
 ```bash
 # For LangGraph integration:
-pip install nervos-sandbox[langgraph]
+pip install bunkervm[langgraph]
 ```
 
 See [tests/test_langgraph.py](tests/test_langgraph.py) for a working example.
@@ -103,10 +103,10 @@ See [tests/test_langgraph.py](tests/test_langgraph.py) for a working example.
 <details>
 <summary>Under the hood</summary>
 
-NervOS is a custom Alpine Linux micro-OS (~256MB) purpose-built for AI agent sandboxing:
+BunkerVM is a custom Alpine Linux micro-OS (~256MB) purpose-built for AI agent sandboxing:
 
 ```
-Your AI  ──MCP──▶  nervos_server  ──vsock──▶  Firecracker MicroVM
+Your AI  ──MCP──▶  bunkervm       ──vsock──▶  Firecracker MicroVM
                    (host)                      ┌──────────────┐
                                                │ Alpine Linux │
                                                │ Python 3     │
@@ -122,7 +122,7 @@ Your AI  ──MCP──▶  nervos_server  ──vsock──▶  Firecracker Mi
 - **TAP networking** — Optional, gives the VM internet access
 - **exec_agent** — HTTP server inside the VM that executes commands
 
-The pre-built bundle (~100MB) includes Firecracker, a Linux kernel, and the rootfs. Downloaded once on first run to `~/.nervos/bundle/`.
+The pre-built bundle (~100MB) includes Firecracker, a Linux kernel, and the rootfs. Downloaded once on first run to `~/.bunkervm/bundle/`.
 
 </details>
 
@@ -133,8 +133,8 @@ The pre-built bundle (~100MB) includes Firecracker, a Linux kernel, and the root
 
 ```bash
 # Clone
-git clone https://github.com/ashishgituser/NervOS.git
-cd NervOS
+git clone https://github.com/ashishgituser/BunkerVM.git
+cd BunkerVM
 
 # Build the micro-OS locally (needs Linux/WSL2 + sudo)
 sudo bash build/setup-firecracker.sh    # Download Firecracker + kernel
@@ -144,7 +144,7 @@ sudo bash build/build-sandbox-rootfs.sh  # Build the 256MB rootfs
 pip install -e ".[dev]"
 
 # Run
-sudo python -m nervos_server
+sudo python -m bunkervm
 ```
 
 Files go into `build/` locally. The bootstrap module auto-detects local builds.
@@ -153,6 +153,6 @@ Files go into `build/` locally. The bootstrap module auto-detects local builds.
 
 ## License
 
-AGPL-3.0 — Free for personal and open-source use. If you modify NervOS and offer it as a service, you must open-source your changes under the same license.
+AGPL-3.0 — Free for personal and open-source use. If you modify BunkerVM and offer it as a service, you must open-source your changes under the same license.
 
 For commercial licensing, contact the author.

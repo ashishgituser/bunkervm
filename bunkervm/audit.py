@@ -1,5 +1,5 @@
 """
-NervOS Audit Logger — Structured event logging (JSONL).
+BunkerVM Audit Logger — Structured event logging (JSONL).
 
 Logs all sandbox operations to a JSONL file for audit, debugging,
 and compliance. Each line is a self-contained JSON object with:
@@ -20,9 +20,9 @@ import threading
 import time
 from typing import Any
 
-logger = logging.getLogger("nervos.audit")
+logger = logging.getLogger("bunkervm.audit")
 
-_DEFAULT_LOG_DIR = os.path.expanduser("~/.nervos/logs")
+_DEFAULT_LOG_DIR = os.path.expanduser("~/.bunkervm/logs")
 _DEFAULT_LOG_FILE = "audit.jsonl"
 
 
@@ -30,7 +30,7 @@ class AuditLogger:
     """Append-only JSONL audit logger.
 
     Usage:
-        audit = AuditLogger("/var/log/nervos/audit.jsonl")
+        audit = AuditLogger("/var/log/bunkervm/audit.jsonl")
         audit.log("exec", command="ls -la", exit_code=0)
         audit.log("sandbox_reset")
     """

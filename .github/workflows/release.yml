@@ -1,6 +1,6 @@
-name: Build & Release NervOS Bundle
+name: Build & Release BunkerVM Bundle
 
-# Builds the pre-built NervOS bundle (our micro-OS + Firecracker + kernel)
+# Builds the pre-built BunkerVM bundle (our micro-OS + Firecracker + kernel)
 # so users just `pip install` and everything downloads automatically.
 #
 # Trigger: push a tag like v0.1.0
@@ -25,7 +25,7 @@ env:
 
 jobs:
   build-bundle:
-    name: Build NervOS Bundle (x86_64)
+    name: Build BunkerVM Bundle (x86_64)
     runs-on: ubuntu-latest
 
     steps:
@@ -62,7 +62,7 @@ jobs:
           curl -sL -o /tmp/vmlinux "${{ env.KERNEL_URL }}"
           ls -lh /tmp/vmlinux
 
-      - name: Build NervOS rootfs
+      - name: Build BunkerVM rootfs
         run: |
           # Build our micro-OS (Alpine + Python + exec_agent)
           sudo bash build/build-sandbox-rootfs.sh
@@ -70,38 +70,38 @@ jobs:
 
       - name: Package bundle
         run: |
-          mkdir -p /tmp/nervos-bundle
-          cp /tmp/firecracker /tmp/nervos-bundle/
-          cp /tmp/vmlinux /tmp/nervos-bundle/
-          cp build/rootfs.ext4 /tmp/nervos-bundle/
+          mkdir -p /tmp/bunkervm-bundle
+          cp /tmp/firecracker /tmp/bunkervm-bundle/
+          cp /tmp/vmlinux /tmp/bunkervm-bundle/
+          cp build/rootfs.ext4 /tmp/bunkervm-bundle/
 
           # Add version metadata
-          echo "{\"version\": \"$VERSION\", \"arch\": \"x86_64\"}" > /tmp/nervos-bundle/bundle.json
+          echo "{\"version\": \"$VERSION\", \"arch\": \"x86_64\"}" > /tmp/bunkervm-bundle/bundle.json
 
           cd /tmp
-          tar czf nervos-bundle-x86_64.tar.gz -C nervos-bundle .
-          ls -lh nervos-bundle-x86_64.tar.gz
+          tar czf bunkervm-bundle-x86_64.tar.gz -C bunkervm-bundle .
+          ls -lh bunkervm-bundle-x86_64.tar.gz
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION }}
-          name: "NervOS ${{ env.VERSION }}"
+          name: "BunkerVM ${{ env.VERSION }}"
           body: |
-            ## NervOS ${{ env.VERSION }}
+            ## BunkerVM ${{ env.VERSION }}
 
             Hardware-isolated sandbox for AI agents.
 
             ### Install
             ```
-            pip install nervos-sandbox
+            pip install bunkervm
             ```
             The bundle downloads automatically on first run.
 
             ### Manual download
-            If auto-download fails, download `nervos-bundle-x86_64.tar.gz` and extract to `~/.nervos/bundle/`.
+            If auto-download fails, download `bunkervm-bundle-x86_64.tar.gz` and extract to `~/.bunkervm/bundle/`.
           files: |
-            /tmp/nervos-bundle-x86_64.tar.gz
+            /tmp/bunkervm-bundle-x86_64.tar.gz
           draft: false
           prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') || contains(env.VERSION, 'rc') }}
 
