@@ -68,7 +68,7 @@ class SandboxClient:
 
     def __init__(
         self,
-        vsock_uds: Optional[str] = None,
+        vsock_uds: Optional[str] = "/tmp/bunkervm-vsock.sock",
         vsock_port: int = 8080,
         host: Optional[str] = None,
         port: int = 8080,
@@ -79,12 +79,12 @@ class SandboxClient:
         self._tcp_port = port
 
         # Determine mode
-        if vsock_uds:
-            self._mode = "vsock"
-            self._label = f"vsock:{vsock_uds}:{vsock_port}"
-        elif host:
+        if host:
             self._mode = "tcp"
             self._label = f"tcp:{host}:{port}"
+        elif vsock_uds:
+            self._mode = "vsock"
+            self._label = f"vsock:{vsock_uds}:{vsock_port}"
         else:
             raise ValueError("Either vsock_uds or host must be provided")
 
