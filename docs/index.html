@@ -838,7 +838,7 @@
             <div class="reveal">
                 <div class="hero-badge">
                     <span class="dot"></span>
-                    v0.2.5 — Now on PyPI
+                    v0.3.0 — Now on PyPI
                 </div>
             </div>
 
@@ -884,7 +884,7 @@
             <div class="stat-label">Boot time</div>
         </div>
         <div class="stat">
-            <div class="stat-value">6</div>
+            <div class="stat-value">8</div>
             <div class="stat-label">MCP tools</div>
         </div>
         <div class="stat">
@@ -939,7 +939,7 @@
         <div class="container">
             <div class="section-label reveal">Tools</div>
             <h2 class="reveal">Everything your agent needs</h2>
-            <p class="section-desc reveal">Six MCP tools give full Linux environment access. All commands run inside the VM — never on your host.</p>
+            <p class="section-desc reveal">Eight MCP tools give full Linux environment access — including file transfer between host and VM. All commands run inside the VM — never on your host.</p>
 
             <div class="tools-grid">
                 <div class="tool-card reveal">
@@ -968,6 +968,16 @@
                     <p>Check VM health — CPU, RAM, disk, uptime.</p>
                 </div>
                 <div class="tool-card reveal reveal-delay-3">
+                    <div class="tool-icon">&#128228;</div>
+                    <h3>sandbox_upload_file</h3>
+                    <p>Upload files from your host into the VM.</p>
+                </div>
+                <div class="tool-card reveal">
+                    <div class="tool-icon">&#128229;</div>
+                    <h3>sandbox_download_file</h3>
+                    <p>Download files from the VM back to host.</p>
+                </div>
+                <div class="tool-card reveal reveal-delay-1">
                     <div class="tool-icon">&#128260;</div>
                     <h3>sandbox_reset</h3>
                     <p>Wipe everything. Clean slate in seconds.</p>
@@ -1060,6 +1070,8 @@
                 <div class="compat-chip"><span class="chip-dot"></span> Claude Desktop</div>
                 <div class="compat-chip"><span class="chip-dot"></span> LangGraph</div>
                 <div class="compat-chip"><span class="chip-dot"></span> LangChain</div>
+                <div class="compat-chip"><span class="chip-dot"></span> OpenAI Agents SDK</div>
+                <div class="compat-chip"><span class="chip-dot"></span> CrewAI</div>
                 <div class="compat-chip"><span class="chip-dot"></span> Any MCP Client</div>
             </div>
         </div>
@@ -1073,10 +1085,6 @@
             <p class="section-desc reveal">It works, but it's early.</p>
 
             <div class="limits-bar reveal">
-                <div class="limit-item">
-                    <span class="limit-icon">&#9679;</span>
-                    One VM at a time
-                </div>
                 <div class="limit-item">
                     <span class="limit-icon">&#9679;</span>
                     Needs sudo
@@ -1097,8 +1105,8 @@
     <section id="langgraph">
         <div class="container">
             <div class="section-label reveal">Integration</div>
-            <h2 class="reveal">5-line LangGraph agent</h2>
-            <p class="section-desc reveal">Install the extras, import the toolkit, build an agent. Every tool call is logged with arrows so you see exactly what happens.</p>
+            <h2 class="reveal">Works with every major framework</h2>
+            <p class="section-desc reveal">LangGraph, OpenAI Agents SDK, CrewAI — install the extras, import the toolkit. Every tool call is logged.</p>
 
             <div class="setup-card reveal" style="max-width: 700px;">
                 <div class="setup-card-header">
@@ -1117,8 +1125,39 @@ result = agent.invoke({
 })</pre>
             </div>
 
+            <div class="setup-cards reveal" style="margin-top: 24px;">
+                <div class="setup-card">
+                    <div class="setup-card-header">
+                        <span class="os-icon">&#128161;</span>
+                        <span>OpenAI Agents SDK</span>
+                    </div>
+                    <pre><span class="key">from</span> agents <span class="key">import</span> Agent, Runner
+<span class="key">from</span> bunkervm.openai_agents <span class="key">import</span> BunkerVMTools
+
+agent = Agent(
+    name=<span class="str">"coder"</span>,
+    tools=BunkerVMTools().get_tools(),
+)
+result = Runner.run_sync(agent, <span class="str">"Find primes under 50"</span>)</pre>
+                </div>
+                <div class="setup-card">
+                    <div class="setup-card-header">
+                        <span class="os-icon">&#9881;&#65039;</span>
+                        <span>CrewAI</span>
+                    </div>
+                    <pre><span class="key">from</span> crewai <span class="key">import</span> Agent, Task, Crew
+<span class="key">from</span> bunkervm.crewai <span class="key">import</span> BunkerVMCrewTools
+
+coder = Agent(
+    role=<span class="str">"Engineer"</span>,
+    tools=BunkerVMCrewTools().get_tools(),
+)
+Crew(agents=[coder], tasks=[task]).kickoff()</pre>
+                </div>
+            </div>
+
             <div style="margin-top: 24px;">
-                <pre style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.9; max-width: 700px; color: var(--text-muted);">$ pip install bunkervm<span style="color: var(--green);">[langgraph]</span>
+                <pre style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.9; max-width: 700px; color: var(--text-muted);">$ pip install bunkervm<span style="color: var(--green);">[all]</span>  <span style="color: var(--text-muted);"># LangGraph + OpenAI + CrewAI</span>
 
 <span style="color: var(--cyan);">→ write_file: /tmp/primes.py</span>
   ← wrote 312 bytes
@@ -1180,8 +1219,8 @@ result = agent.invoke({
                 lines: [
                     { type: 'cmd', prompt: '$ ', text: 'pip install bunkervm[langgraph]' },
                     { type: 'output', text: 'Collecting bunkervm[langgraph]' },
-                    { type: 'output', text: '  Downloading bunkervm-0.2.5.tar.gz (42 kB)' },
-                    { type: 'success', text: 'Successfully installed bunkervm-0.2.5' },
+                    { type: 'output', text: '  Downloading bunkervm-0.3.0.tar.gz (48 kB)' },
+                    { type: 'success', text: 'Successfully installed bunkervm-0.3.0' },
                     { type: 'output', text: '' },
                     { type: 'cmd', prompt: '$ ', text: 'sudo python3 -m bunkervm &' },
                     { type: 'info', text: '⚡ Downloading BunkerVM bundle (first run)...' },

@@ -1,46 +1,49 @@
 """
-BunkerVM LangChain/LangGraph Integration — drop-in secure sandbox tools.
+BunkerVM OpenAI Agents SDK Integration — drop-in secure sandbox tools.
+
+Works with the OpenAI Agents SDK (openai-agents / agents-sdk).
 
 Usage:
-    from bunkervm.langchain import BunkerVMToolkit
-    from langchain_openai import ChatOpenAI
-    from langgraph.prebuilt import create_react_agent
+    from bunkervm.openai_agents import BunkerVMTools
+    from agents import Agent, Runner
 
-    toolkit = BunkerVMToolkit()          # auto-connects to running VM
-    agent = create_react_agent(ChatOpenAI(model="gpt-4o"), toolkit.get_tools())
-    result = agent.invoke({"messages": [("human", "Write and run hello.py")]})
+    tools = BunkerVMTools()
+    agent = Agent(
+        name="coder",
+        instructions="You write and run code in a secure sandbox.",
+        tools=tools.get_tools(),
+    )
+    result = Runner.run_sync(agent, "Write a hello world script and run it")
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
-
-from langchain_core.tools import tool as langchain_tool
 
 from bunkervm.sandbox_client import SandboxClient
 
-logger = logging.getLogger("bunkervm.langchain")
+logger = logging.getLogger("bunkervm.openai_agents")
 
-# Default vsock path (matches BunkerVM server default)
 _DEFAULT_VSOCK_UDS = "/tmp/bunkervm-vsock.sock"
 _DEFAULT_VSOCK_PORT = 8080
 
 
-class BunkerVMToolkit:
-    """LangChain-compatible toolkit that routes all tool calls to BunkerVM.
+class BunkerVMTools:
+    """OpenAI Agents SDK-compatible tool provider for BunkerVM.
 
-    Provides: run_command, write_file, read_file, list_dir
+    Provides: run_command, write_file, read_file, list_directory,
+              upload_file, download_file
 
-    All operations execute inside a hardware-isolated Firecracker MicroVM —
-    zero risk to the host system.
+    All operations execute inside a hardware-isolated Firecracker MicroVM.
 
     Args:
-        vsock_uds: Path to BunkerVM vsock socket. Default: /tmp/bunkervm-vsock.sock
+        vsock_uds: Path to BunkerVM vsock socket
         vsock_port: Vsock port (default 8080)
-        host: TCP host for network mode (alternative to vsock)
+        host: TCP host for network mode
         port: TCP port for network mode
-        command_timeout: Default timeout for command execution (seconds)
+        command_timeout: Default command execution timeout in seconds
     """
 
     def __init__(
@@ -55,30 +58,29 @@ class BunkerVMToolkit:
             self._client = SandboxClient(host=host, port=port)
         else:
             self._client = SandboxClient(vsock_uds=vsock_uds, vsock_port=vsock_port)
-
         self._command_timeout = command_timeout
-        logger.info("BunkerVMToolkit connected (%s)", self._client.label)
+        logger.info("BunkerVMTools connected (%s)", self._client.label)
 
     @property
     def client(self) -> SandboxClient:
-        """Direct access to the underlying SandboxClient."""
         return self._client
 
     def get_tools(self) -> list:
-        """Return LangChain-compatible tools bound to this VM.
+        """Return OpenAI Agents SDK-compatible function tools.
 
-        Returns a list of tools ready to pass to create_react_agent(),
-        ToolNode(), or bind_tools().
+        Returns a list of tool definitions using the @function_tool decorator
+        from the agents SDK.
         """
+        from agents import function_tool
+
         client = self._client
         timeout = self._command_timeout
 
-        @langchain_tool
+        @function_tool
         def run_command(command: str) -> str:
             """Run a shell command inside the secure BunkerVM sandbox.
-            Use this to execute any bash command, run scripts, install packages, etc.
-            The sandbox is a full Linux environment with Python, network access, and
-            a real filesystem — but hardware-isolated from the host."""
+            The sandbox is a full Linux environment with hardware isolation.
+            Use this for running scripts, installing packages, processing data, etc."""
             logger.info("\u2192 run_command: %s", command[:120])
             r = client.exec(command, timeout=timeout)
             stdout = r.get("stdout", "")
@@ -95,23 +97,23 @@ class BunkerVMToolkit:
                         duration, len(stdout))
             return output or "(no output)"
 
-        @langchain_tool
+        @function_tool
         def write_file(path: str, content: str) -> str:
             """Write a file inside the secure BunkerVM sandbox.
-            Creates parent directories automatically. Use absolute paths like /tmp/script.py."""
+            Creates parent directories automatically. Use absolute paths."""
             logger.info("\u2192 write_file: %s (%d bytes)", path, len(content))
             r = client.write_file(path, content)
-            bytes_written = r.get("bytes_written", 0)
-            return f"Wrote {bytes_written} bytes to {path}"
+            size = r.get("bytes_written", r.get("size", 0))
+            return f"Wrote {size} bytes to {path}"
 
-        @langchain_tool
+        @function_tool
         def read_file(path: str) -> str:
             """Read the contents of a file from the BunkerVM sandbox."""
             logger.info("\u2192 read_file: %s", path)
             r = client.read_file(path)
             return r.get("content", "(empty file)")
 
-        @langchain_tool
+        @function_tool
         def list_directory(path: str = "/") -> str:
             """List files and directories at a path in the BunkerVM sandbox."""
             logger.info("\u2192 list_directory: %s", path)
@@ -129,34 +131,28 @@ class BunkerVMToolkit:
                 lines.append(f"  {name}{suffix}{size_str}")
             return f"{path}:\n" + "\n".join(lines)
 
-        @langchain_tool
+        @function_tool
         def upload_file(local_path: str, remote_path: str) -> str:
-            """Upload a file from the host into the BunkerVM sandbox.
-            Use this to provide datasets, configs, or other files to the sandbox."""
-            import os
+            """Upload a file from the host into the BunkerVM sandbox."""
             logger.info("\u2192 upload_file: %s -> %s", local_path, remote_path)
             if not os.path.exists(local_path):
                 return f"[ERROR] Local file not found: {local_path}"
             try:
                 result = client.upload_file(local_path, remote_path)
                 size = result.get("size", os.path.getsize(local_path))
-                logger.info("  \u2190 uploaded %d bytes", size)
                 return f"Uploaded {local_path} -> {remote_path} ({size} bytes)"
             except Exception as e:
                 return f"[ERROR] Upload failed: {e}"
 
-        @langchain_tool
+        @function_tool
         def download_file(remote_path: str, local_path: str) -> str:
-            """Download a file from the BunkerVM sandbox to the host.
-            Use this to save results, generated files, or artifacts."""
-            import os
+            """Download a file from the BunkerVM sandbox to the host."""
             logger.info("\u2192 download_file: %s -> %s", remote_path, local_path)
             try:
                 data = client.download_file(remote_path)
                 os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
                 with open(local_path, "wb") as f:
                     f.write(data)
-                logger.info("  \u2190 downloaded %d bytes", len(data))
                 return f"Downloaded {remote_path} -> {local_path} ({len(data)} bytes)"
             except Exception as e:
                 return f"[ERROR] Download failed: {e}"

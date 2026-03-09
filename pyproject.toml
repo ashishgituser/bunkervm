@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bunkervm"
-version = "0.2.5"
+version = "0.4.0"
 description = "Hardware-isolated Linux sandbox for AI agents — Firecracker MicroVM + MCP"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -40,9 +40,25 @@ langgraph = [
     "langchain-core>=0.1.0",
     "python-dotenv>=1.0.0",
 ]
+openai-agents = [
+    "openai-agents>=0.1.0",
+    "python-dotenv>=1.0.0",
+]
+crewai = [
+    "crewai>=0.50.0",
+    "python-dotenv>=1.0.0",
+]
+all = [
+    "langchain-openai>=0.1.0",
+    "langgraph>=0.1.0",
+    "langchain-core>=0.1.0",
+    "openai-agents>=0.1.0",
+    "crewai>=0.50.0",
+    "python-dotenv>=1.0.0",
+]
 
 [project.scripts]
-bunkervm = "bunkervm.__main__:main"
+bunkervm = "bunkervm.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/ashishgituser/bunkervm"

@@ -51,8 +51,10 @@ def _get_audit():
     return _audit
 
 
-def create_server() -> FastMCP:
+def create_server(port: int = 8000, host: str = "0.0.0.0") -> FastMCP:
     """Create and return the configured MCP server instance."""
+    mcp.settings.port = port
+    mcp.settings.host = host
     return mcp
 
 
@@ -363,6 +365,78 @@ def sandbox_status() -> str:
 
 
 # ── Tool: Reset Sandbox ──
+
+@mcp.tool()
+def sandbox_upload_file(local_path: str, remote_path: str) -> str:
+    """Upload a file from the host filesystem into the sandbox VM.
+
+    Transfers files binary-safely using base64 encoding. Use this to provide
+    datasets, configs, or other files to the sandbox environment.
+
+    Args:
+        local_path: Absolute path to the file on the host (e.g., "/home/user/data.csv")
+        remote_path: Destination path inside the VM (e.g., "/root/data.csv")
+
+    Returns:
+        Confirmation with file path and size.
+    """
+    client = _get_client()
+    audit = _get_audit()
+
+    logger.info("\u2192 sandbox_upload_file: %s -> %s", local_path, remote_path)
+    audit.log("upload_file", local_path=local_path, remote_path=remote_path)
+
+    import os
+    if not os.path.exists(local_path):
+        return f"[ERROR] Local file not found: {local_path}"
+
+    try:
+        result = client.upload_file(local_path, remote_path)
+    except Exception as e:
+        return f"[ERROR] Upload failed: {e}"
+
+    if "error" in result:
+        return f"[ERROR] {result['error']}"
+
+    size = result.get("size", os.path.getsize(local_path))
+    return f"Uploaded {local_path} -> {remote_path} ({size} bytes)"
+
+
+@mcp.tool()
+def sandbox_download_file(remote_path: str, local_path: str) -> str:
+    """Download a file from the sandbox VM to the host filesystem.
+
+    Retrieves files binary-safely. Use this to save results, generated files,
+    or artifacts from the sandbox to the host.
+
+    Args:
+        remote_path: Path inside the VM (e.g., "/root/output.png")
+        local_path: Destination path on the host (e.g., "/home/user/output.png")
+
+    Returns:
+        Confirmation with file path and size.
+    """
+    client = _get_client()
+    audit = _get_audit()
+
+    logger.info("\u2192 sandbox_download_file: %s -> %s", remote_path, local_path)
+    audit.log("download_file", remote_path=remote_path, local_path=local_path)
+
+    import os
+    try:
+        data = client.download_file(remote_path)
+    except Exception as e:
+        return f"[ERROR] Download failed: {e}"
+
+    try:
+        os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
+        with open(local_path, "wb") as f:
+            f.write(data)
+    except Exception as e:
+        return f"[ERROR] Failed to write local file: {e}"
+
+    return f"Downloaded {remote_path} -> {local_path} ({len(data)} bytes)"
+
 
 @mcp.tool()
 def sandbox_reset() -> str:

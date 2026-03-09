@@ -268,20 +268,50 @@ class VMManager:
     # ── Internal helpers ──
 
     def _validate(self) -> None:
-        """Check prerequisites."""
-        for name, path in {
-            "Firecracker binary": self.config.firecracker_bin,
-            "Kernel image": self.config.kernel_path,
-            "Root filesystem": self.config.rootfs_path,
-        }.items():
-            if not os.path.exists(path):
-                raise VMError(f"{name} not found: {path}")
-
+        """Check prerequisites with clear, actionable error messages."""
+        # Check KVM first (most common failure)
         if not os.path.exists("/dev/kvm"):
             raise VMError(
-                "/dev/kvm not found. KVM is required.\n"
-                "On WSL2: ensure [wsl2] nestedVirtualization=true in .wslconfig"
+                "\n╔══════════════════════════════════════════════════════╗\n"
+                "║  KVM is not available                                ║\n"
+                "╚══════════════════════════════════════════════════════╝\n\n"
+                "BunkerVM requires KVM for hardware-isolated sandboxes.\n\n"
+                "Fix:\n"
+                "  WSL2 (Windows):\n"
+                "    1. Add to %USERPROFILE%\\.wslconfig:\n"
+                "       [wsl2]\n"
+                "       nestedVirtualization=true\n"
+                "    2. Restart WSL: wsl --shutdown\n\n"
+                "  Linux:\n"
+                "    1. Enable virtualization in BIOS\n"
+                "    2. sudo modprobe kvm_intel  (or kvm_amd)\n"
+                "    3. sudo chmod 666 /dev/kvm\n"
             )
+
+        # Check KVM permissions
+        if not os.access("/dev/kvm", os.R_OK | os.W_OK):
+            raise VMError(
+                "\n╔══════════════════════════════════════════════════════╗\n"
+                "║  Permission denied: /dev/kvm                         ║\n"
+                "╚══════════════════════════════════════════════════════╝\n\n"
+                "Fix:\n"
+                "  sudo chmod 666 /dev/kvm\n"
+                "  Or run BunkerVM with sudo: sudo bunkervm demo\n"
+            )
+
+        # Check required files
+        checks = {
+            "Firecracker binary": self.config.firecracker_bin,
+            "Kernel image (vmlinux)": self.config.kernel_path,
+            "Root filesystem (rootfs.ext4)": self.config.rootfs_path,
+        }
+        for name, path in checks.items():
+            if not os.path.exists(path):
+                raise VMError(
+                    f"\n{name} not found: {path}\n\n"
+                    f"Fix: Run 'bunkervm demo' to auto-download,\n"
+                    f"or download from: https://github.com/ashishgituser/bunkervm/releases\n"
+                )
 
     def _create_rootfs_copy(self) -> None:
         """Create a working copy of rootfs for clean resets."""

@@ -130,6 +130,31 @@ class SandboxClient:
         """List directory contents."""
         return self._request("POST", "/list-dir", {"path": path})
 
+    def upload_file(
+        self,
+        local_path: str,
+        remote_path: str,
+    ) -> dict:
+        """Upload a file from host to sandbox (binary-safe via base64)."""
+        import base64
+        with open(local_path, "rb") as f:
+            data = f.read()
+        encoded = base64.b64encode(data).decode("ascii")
+        return self._request(
+            "POST", "/write-file",
+            {"path": remote_path, "content": encoded, "encoding": "base64", "mode": "overwrite"},
+        )
+
+    def download_file(self, remote_path: str) -> bytes:
+        """Download a file from sandbox to host (returns raw bytes)."""
+        import base64
+        result = self._request("POST", "/read-file", {"path": remote_path})
+        content = result.get("content", "")
+        encoding = result.get("encoding", "utf-8")
+        if encoding == "base64":
+            return base64.b64decode(content)
+        return content.encode("utf-8")
+
     def health(self) -> dict:
         """Health check."""
         return self._request("GET", "/health", timeout=_HEALTH_TIMEOUT)

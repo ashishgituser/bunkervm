@@ -28,7 +28,16 @@ import logging
 import sys
 
 
+# Route new CLI subcommands (demo, run, info) to the new CLI
+_CLI_COMMANDS = {"demo", "run", "info", "server"}
+
+
 def main():
+    # If first arg is a new CLI subcommand, delegate to bunkervm.cli
+    if len(sys.argv) > 1 and sys.argv[1] in _CLI_COMMANDS:
+        from .cli import main as cli_main
+        raise SystemExit(cli_main())
+
     parser = argparse.ArgumentParser(
         prog="bunkervm",
         description="BunkerVM — Hardware-isolated sandbox for AI agents",
@@ -62,6 +71,30 @@ def main():
         help="Override VM exec-agent port",
     )
     parser.add_argument(
+        "--cpus", type=int, default=None,
+        help="Number of vCPUs for the VM (default: 2)",
+    )
+    parser.add_argument(
+        "--memory", type=int, default=None,
+        help="VM memory in MB (default: 2048)",
+    )
+    parser.add_argument(
+        "--max-exec-timeout", type=int, default=None,
+        help="Maximum allowed command timeout in seconds (default: 300)",
+    )
+    parser.add_argument(
+        "--name", default=None,
+        help="VM instance name (for multi-VM support)",
+    )
+    parser.add_argument(
+        "--dashboard", action="store_true",
+        help="Enable web dashboard at http://localhost:<port+1>/dashboard",
+    )
+    parser.add_argument(
+        "--dashboard-port", type=int, default=None,
+        help="Dashboard port (default: MCP port + 1, i.e. 3001)",
+    )
+    parser.add_argument(
         "-v", "--verbose", action="store_true",
         help="Enable debug logging",
     )
@@ -83,6 +116,12 @@ def main():
         config.vm_ip = args.vm_ip
     if args.vm_port:
         config.vm_port = args.vm_port
+    if args.cpus:
+        config.vcpu_count = args.cpus
+    if args.memory:
+        config.mem_size_mib = args.memory
+    if args.max_exec_timeout:
+        config.max_exec_timeout = args.max_exec_timeout
 
     # ── Audit logger ──
     from .audit import AuditLogger
@@ -104,6 +143,14 @@ def main():
     vm = None
     if not args.skip_vm:
         from .vm_manager import VMManager
+
+        # If --name is provided, use unique paths for this instance
+        if args.name:
+            safe_name = args.name.replace("/", "-").replace(" ", "-")
+            config.vsock_uds_path = f"/tmp/bunkervm-vm-{safe_name}.sock"
+            config.socket_path = f"/tmp/bunkervm-fc-{safe_name}.sock"
+            config.rootfs_work_path = f"/tmp/bunkervm-rootfs-{safe_name}.ext4"
+            logger.info("Named instance: %s", args.name)
 
         vm = VMManager(config, network=network)
         try:
@@ -139,14 +186,21 @@ def main():
     from .mcp_server import create_server, set_globals
 
     set_globals(client=client, audit=audit, vm_manager=vm, config=config)
-    server = create_server()
+    server = create_server(port=args.port, host="0.0.0.0")
 
     logger.info("BunkerVM MCP server ready (transport: %s)", args.transport)
     audit.log("server_ready", transport=args.transport)
 
+    # ── Start dashboard (if enabled or SSE transport) ──
+    if args.dashboard or args.transport == "sse":
+        from .dashboard import DashboardServer
+        dash_port = args.dashboard_port or (args.port + 1)
+        dashboard = DashboardServer(client, audit, vm, port=dash_port, config=config)
+        dashboard.start()
+
     if args.transport == "sse":
         logger.info("SSE endpoint: http://0.0.0.0:%d/sse", args.port)
-        server.run(transport="sse", port=args.port)
+        server.run(transport="sse")
     else:
         server.run(transport="stdio")
 
