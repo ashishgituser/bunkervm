@@ -85,17 +85,19 @@
   <circle class="dot-g" cx="60" cy="19" r="6"/>
   <text class="title-text" x="410" y="23" text-anchor="middle">bunkervm — demo</text>
 
-  <!-- Scene 1: Install & Boot -->
+  <!-- Scene 1: Install -->
   <g class="line l1">
     <text class="prompt" x="20" y="68">$</text>
-    <text class="cmd" x="35" y="68">pip install bunkervm[langgraph]</text>
+    <text class="cmd" x="35" y="68">pip install bunkervm</text>
   </g>
   <g class="line l2">
     <text class="success" x="20" y="90">✓ Installed bunkervm-0.6.0</text>
   </g>
+
+  <!-- Scene 2: Run demo -->
   <g class="line l3">
     <text class="prompt" x="20" y="118">$</text>
-    <text class="cmd" x="35" y="118">python3 agent_demo.py</text>
+    <text class="cmd" x="35" y="118">bunkervm demo</text>
   </g>
   <g class="line l4">
     <text class="info" x="20" y="140">⚡ Booting Firecracker MicroVM...</text>
@@ -104,54 +106,54 @@
     <text class="success" x="20" y="162">✓ VM ready in 2.3s — KVM hardware isolation active</text>
   </g>
   <g class="line l6">
-    <text class="success" x="20" y="184">✓ 6 sandbox tools loaded: run_command, write_file, read_file, ...</text>
-  </g>
-  <g class="line l7">
-    <text class="output" x="20" y="206">  Kernel: 6.1.102 │ OS: Alpine Linux │ Python: 3.12</text>
-  </g>
-  <g class="line l8">
-    <text class="success" x="20" y="228">✓ Agent connected to sandbox</text>
+    <text class="output" x="20" y="184">  Kernel: 6.1.102 │ OS: Alpine Linux │ Python: 3.12</text>
   </g>
 
-  <!-- Scene 2: Agent Execution -->
+  <!-- Scene 3: Code execution inside VM -->
+  <g class="line l7">
+    <text class="output" x="20" y="212">  Running code inside sandbox...</text>
+  </g>
+  <g class="line l8">
+    <text class="output" x="20" y="240"></text>
+  </g>
   <g class="line l9">
-    <text class="output" x="20" y="260">  Task: "Write a prime finder, save it, and run it"</text>
+    <text class="agent" x="20" y="250">  Prime numbers under 100:</text>
   </g>
   <g class="line l10">
-    <text class="output" x="20" y="282"></text>
+    <text class="agent" x="20" y="272">  2  3  5  7  11  13  17  19  23  29  31  37  41  43  47</text>
   </g>
   <g class="line l11">
-    <text class="arrow" x="20" y="296">→ write_file</text>
-    <text class="output" x="130" y="296">  /tmp/primes.py (312 bytes)</text>
+    <text class="agent" x="20" y="294">  53  59  61  67  71  73  79  83  89  97</text>
   </g>
   <g class="line l12">
-    <text class="output" x="20" y="318">  ← wrote 312 bytes</text>
+    <text class="output" x="20" y="322"></text>
   </g>
   <g class="line l13">
-    <text class="arrow" x="20" y="340">→ run_command</text>
-    <text class="output" x="140" y="340">  python3 /tmp/primes.py</text>
+    <text class="success" x="20" y="332">✓ Code ran safely inside a Firecracker microVM</text>
   </g>
   <g class="line l14">
-    <text class="success" x="20" y="362">  ← exit 0 (42ms)</text>
+    <text class="success" x="20" y="354">✓ Full Linux environment (not a container)</text>
   </g>
   <g class="line l15">
-    <text class="output" x="20" y="390"></text>
+    <text class="success" x="20" y="376">✓ Hardware-level isolation via KVM</text>
   </g>
   <g class="line l16">
-    <text class="agent" x="20" y="398">🤖 All prime numbers under 100:</text>
+    <text class="success" x="20" y="398">✓ VM destroyed after demo</text>
   </g>
+
+  <!-- Scene 4: Cleanup -->
   <g class="line l17">
-    <text class="agent" x="20" y="420">   [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47,</text>
+    <text class="output" x="20" y="426"></text>
   </g>
   <g class="line l18">
-    <text class="agent" x="20" y="442">    53, 59, 61, 67, 71, 73, 79, 83, 89, 97]</text>
+    <text class="info" x="20" y="436">🧹 Destroying sandbox...</text>
   </g>
   <g class="line l19">
-    <text class="output" x="20" y="468"></text>
+    <text class="success" x="20" y="458">Done. ✓ Demo completed in 3.6s</text>
   </g>
   <g class="line l20">
-    <text class="success" x="20" y="472">🧹 VM destroyed. Your host was never touched.</text>
-    <rect class="cursor" x="400" y="460" width="8" height="16"/>
+    <text class="success" x="20" y="472">Your host was never touched.</text>
+    <rect class="cursor" x="248" y="460" width="8" height="16"/>
   </g>
 
   <!-- Rewind hint -->
