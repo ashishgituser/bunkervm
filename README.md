@@ -146,17 +146,19 @@ pip install bunkervm[langgraph]
 ```python
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
-from bunkervm import secure_agent
+from bunkervm.langchain import BunkerVMToolkit
 
-runtime = secure_agent()
-tool = runtime.as_tool()
+toolkit = BunkerVMToolkit()   # auto-boots a Firecracker VM
 
-agent = create_react_agent(ChatOpenAI(model="gpt-4o"), tools=[tool])
+agent = create_react_agent(
+    ChatOpenAI(model="gpt-4o"),
+    tools=toolkit.get_tools(),  # run_command, write_file, read_file, ...
+)
 result = agent.invoke({
     "messages": [("user", "Write a Python script that finds primes under 50, then run it")]
 })
 
-runtime.stop()
+toolkit.stop()   # destroy VM
 ```
 
 ### With OpenAI Agents SDK
@@ -167,20 +169,19 @@ pip install bunkervm[openai-agents]
 
 ```python
 from agents import Agent, Runner
-from bunkervm import secure_agent
+from bunkervm.openai_agents import BunkerVMTools
 
-runtime = secure_agent()
-tool = runtime.as_openai_tool()
+tools = BunkerVMTools()   # auto-boots a Firecracker VM
 
 agent = Agent(
     name="coder",
     instructions="You write and run code inside a secure VM.",
-    tools=[tool],
+    tools=tools.get_tools(),
 )
 
 result = Runner.run_sync(agent, "Calculate the first 20 fibonacci numbers")
 print(result.final_output)
-runtime.stop()
+tools.stop()
 ```
 
 ### With CrewAI
@@ -193,13 +194,16 @@ pip install bunkervm[crewai]
 from crewai import Agent, Task, Crew
 from bunkervm.crewai import BunkerVMCrewTools
 
+tools = BunkerVMCrewTools()   # auto-boots a Firecracker VM
+
 coder = Agent(
     role="Software Engineer",
     goal="Write and test code inside a secure sandbox",
-    tools=BunkerVMCrewTools().get_tools(),
+    tools=tools.get_tools(),
 )
 task = Task(description="Write a web scraper for Hacker News", agent=coder)
 Crew(agents=[coder], tasks=[task]).kickoff()
+tools.stop()
 ```
 
 ### With Claude Desktop (MCP)

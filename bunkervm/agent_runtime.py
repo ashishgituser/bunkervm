@@ -155,13 +155,19 @@ class SecureAgentRuntime:
         except Exception:
             pass
 
-    # ── LangChain/LangGraph Integration ──
+    # ── Framework Tool Shortcuts ──
 
     def as_tool(self, name: str = "execute_code") -> Any:
         """Create a LangChain-compatible tool that runs code in this sandbox.
 
-        Returns a tool that can be passed to create_react_agent() or any
-        LangChain agent.
+        For a full set of tools (run_command, write_file, read_file, etc.),
+        use ``BunkerVMToolkit`` instead::
+
+            from bunkervm.langchain import BunkerVMToolkit
+            toolkit = BunkerVMToolkit()
+            tools = toolkit.get_tools()
+
+        This method creates a single "execute_code" tool for simple cases.
 
         Usage:
             runtime = SecureAgentRuntime()
@@ -199,6 +205,15 @@ class SecureAgentRuntime:
 
     def as_openai_tool(self, name: str = "execute_code") -> Any:
         """Create an OpenAI Agents SDK tool.
+
+        For a full set of tools (run_command, write_file, read_file, etc.),
+        use ``BunkerVMTools`` instead::
+
+            from bunkervm.openai_agents import BunkerVMTools
+            tools = BunkerVMTools()
+            agent_tools = tools.get_tools()
+
+        This method creates a single "execute_code" tool for simple cases.
 
         Usage:
             runtime = SecureAgentRuntime()

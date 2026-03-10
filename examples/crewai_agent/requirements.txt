@@ -1,0 +1,2 @@
+bunkervm[crewai]
+python-dotenv

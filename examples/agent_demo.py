@@ -5,8 +5,13 @@ BunkerVM + AI Agent Demo — Secure code execution with LangGraph.
 Shows how to run an AI agent that generates and executes code
 inside a hardware-isolated BunkerVM sandbox.
 
+For per-framework examples, see:
+    examples/langchain_agent/agent_demo.py
+    examples/openai_agent/agent_demo.py
+    examples/crewai_agent/agent_demo.py
+
 Prerequisites:
-    pip install bunkervm[langgraph]
+    pip install bunkervm[langgraph] langchain-openai python-dotenv
     export OPENAI_API_KEY=your-key-here
 
 Usage:
@@ -19,20 +24,19 @@ load_dotenv()
 
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
-from bunkervm import secure_agent
+from bunkervm.langchain import BunkerVMToolkit
 
 
 def main():
     print("\n🔒 BunkerVM Agent Demo")
     print("=" * 40)
 
-    # 1. Create an AI agent with a secure code execution tool
-    runtime = secure_agent()
-    tool = runtime.as_tool()
+    # 1. Create toolkit (auto-boots a Firecracker VM with full sandbox tools)
+    toolkit = BunkerVMToolkit()
 
     agent = create_react_agent(
         ChatOpenAI(model="gpt-4o"),
-        tools=[tool],
+        tools=toolkit.get_tools(),
     )
 
     # 2. Ask the agent to write and run code
@@ -48,7 +52,7 @@ def main():
             print(msg.content)
 
     # 4. Clean up
-    runtime.stop()
+    toolkit.stop()
     print("\n✓ Sandbox destroyed")
 
 
