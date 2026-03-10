@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Main gradient - purple to cyan -->
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c5cfc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22d3ee;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Shield glow -->
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9b82fc;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#7c5cfc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22d3ee;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Inner glow -->
+    <radialGradient id="innerGlow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" style="stop-color:#22d3ee;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#050508;stop-opacity:0" />
+    </radialGradient>
+
+    <!-- Circuit line gradient -->
+    <linearGradient id="circuitGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7c5cfc;stop-opacity:0.6" />
+      <stop offset="50%" style="stop-color:#22d3ee;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#34d399;stop-opacity:0.6" />
+    </linearGradient>
+
+    <!-- Drop shadow filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
+      <feFlood flood-color="#7c5cfc" flood-opacity="0.4" result="color" />
+      <feComposite in="color" in2="blur" operator="in" result="shadow" />
+      <feMerge>
+        <feMergeNode in="shadow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="cyanGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+      <feFlood flood-color="#22d3ee" flood-opacity="0.5" result="color" />
+      <feComposite in="color" in2="blur" operator="in" result="shadow" />
+      <feMerge>
+        <feMergeNode in="shadow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="248" fill="#050508" stroke="url(#grad1)" stroke-width="3" opacity="0.95"/>
+
+  <!-- Subtle grid lines inside circle -->
+  <g opacity="0.06" stroke="#7c5cfc" stroke-width="0.5">
+    <line x1="56" y1="128" x2="456" y2="128"/>
+    <line x1="56" y1="192" x2="456" y2="192"/>
+    <line x1="56" y1="256" x2="456" y2="256"/>
+    <line x1="56" y1="320" x2="456" y2="320"/>
+    <line x1="56" y1="384" x2="456" y2="384"/>
+    <line x1="128" y1="56" x2="128" y2="456"/>
+    <line x1="192" y1="56" x2="192" y2="456"/>
+    <line x1="256" y1="56" x2="256" y2="456"/>
+    <line x1="320" y1="56" x2="320" y2="456"/>
+    <line x1="384" y1="56" x2="384" y2="456"/>
+  </g>
+
+  <!-- Inner glow -->
+  <circle cx="256" cy="220" r="140" fill="url(#innerGlow)"/>
+
+  <!-- Shield shape - futuristic bunker -->
+  <g filter="url(#glow)">
+    <path d="M256 100 L370 165 L370 310 L256 400 L142 310 L142 165 Z"
+          fill="none" stroke="url(#shieldGrad)" stroke-width="4" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Inner shield -->
+  <path d="M256 120 L355 178 L355 300 L256 380 L157 300 L157 178 Z"
+        fill="#0c0c12" fill-opacity="0.8" stroke="url(#grad1)" stroke-width="1.5" stroke-linejoin="round" opacity="0.6"/>
+
+  <!-- CPU/VM chip in center -->
+  <g filter="url(#cyanGlow)">
+    <!-- Chip body -->
+    <rect x="210" y="200" width="92" height="92" rx="8" ry="8"
+          fill="#0c0c12" stroke="url(#grad1)" stroke-width="2.5"/>
+
+    <!-- Chip pins - top -->
+    <line x1="232" y1="190" x2="232" y2="200" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+    <line x1="256" y1="185" x2="256" y2="200" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+    <line x1="280" y1="190" x2="280" y2="200" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Chip pins - bottom -->
+    <line x1="232" y1="292" x2="232" y2="302" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+    <line x1="256" y1="292" x2="256" y2="307" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+    <line x1="280" y1="292" x2="280" y2="302" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Chip pins - left -->
+    <line x1="200" y1="225" x2="210" y2="225" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+    <line x1="195" y1="246" x2="210" y2="246" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+    <line x1="200" y1="267" x2="210" y2="267" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Chip pins - right -->
+    <line x1="302" y1="225" x2="312" y2="225" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+    <line x1="302" y1="246" x2="317" y2="246" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+    <line x1="302" y1="267" x2="312" y2="267" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Lock icon inside chip -->
+  <g transform="translate(256, 246)">
+    <!-- Lock body -->
+    <rect x="-14" y="-4" width="28" height="22" rx="3" ry="3"
+          fill="none" stroke="url(#grad1)" stroke-width="2.5"/>
+    <!-- Lock shackle -->
+    <path d="M-8 -4 L-8 -14 A8 8 0 0 1 8 -14 L8 -4"
+          fill="none" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Keyhole -->
+    <circle cx="0" cy="6" r="3.5" fill="#7c5cfc"/>
+    <rect x="-1.5" y="6" width="3" height="7" rx="1" fill="#7c5cfc"/>
+  </g>
+
+  <!-- Circuit traces from chip to shield edges -->
+  <g stroke="url(#circuitGrad)" stroke-width="1.2" fill="none" opacity="0.5" stroke-linecap="round">
+    <!-- Top-left trace -->
+    <path d="M232 190 L232 175 L190 155 L165 170"/>
+    <!-- Top-right trace -->
+    <path d="M280 190 L280 175 L322 155 L347 170"/>
+    <!-- Bottom-left trace -->
+    <path d="M232 302 L232 320 L190 340 L165 325"/>
+    <!-- Bottom-right trace -->
+    <path d="M280 302 L280 320 L322 340 L347 325"/>
+    <!-- Left trace -->
+    <path d="M195 246 L175 246 L160 235"/>
+    <!-- Right trace -->
+    <path d="M317 246 L337 246 L352 235"/>
+  </g>
+
+  <!-- Corner circuit nodes -->
+  <g fill="#22d3ee" opacity="0.7">
+    <circle cx="165" cy="170" r="3"/>
+    <circle cx="347" cy="170" r="3"/>
+    <circle cx="165" cy="325" r="3"/>
+    <circle cx="347" cy="325" r="3"/>
+    <circle cx="160" cy="235" r="3"/>
+    <circle cx="352" cy="235" r="3"/>
+  </g>
+
+  <!-- Orbital ring -->
+  <ellipse cx="256" cy="248" rx="160" ry="45" fill="none" stroke="url(#grad1)" stroke-width="1" opacity="0.15" transform="rotate(-20, 256, 248)"/>
+  <ellipse cx="256" cy="248" rx="160" ry="45" fill="none" stroke="url(#grad1)" stroke-width="1" opacity="0.1" transform="rotate(20, 256, 248)"/>
+
+  <!-- Small accent dots on orbital -->
+  <circle cx="115" cy="218" r="2.5" fill="#34d399" opacity="0.8"/>
+  <circle cx="397" cy="278" r="2.5" fill="#f472b6" opacity="0.8"/>
+  <circle cx="130" cy="290" r="2" fill="#22d3ee" opacity="0.6"/>
+  <circle cx="382" cy="206" r="2" fill="#7c5cfc" opacity="0.6"/>
+
+  <!-- "VM" text below chip -->
+  <text x="256" y="368" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace"
+        font-size="28" font-weight="700" fill="url(#grad1)" letter-spacing="6">VM</text>
+
+  <!-- Subtle "B" monogram above shield -->
+  <text x="256" y="152" text-anchor="middle" font-family="'Inter', 'Segoe UI', sans-serif"
+        font-size="22" font-weight="800" fill="url(#grad1)" opacity="0.7" letter-spacing="2">BUNKER</text>
+</svg>

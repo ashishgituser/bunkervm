@@ -145,6 +145,14 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
             letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo img {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
         }
         .nav-links a {
             color: var(--text-muted);
@@ -821,7 +829,7 @@
     <!-- Nav -->
     <nav id="navbar">
         <div class="container">
-            <a href="#" class="logo">BunkerVM</a>
+            <a href="#" class="logo"><img src="logo.svg" alt="BunkerVM">BunkerVM</a>
             <div class="nav-links">
                 <a href="#architecture" class="hide-mobile">Architecture</a>
                 <a href="#tools" class="hide-mobile">Tools</a>

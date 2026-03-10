@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.png" alt="BunkerVM" width="120" />
+  <img src="docs/logo.svg" alt="BunkerVM" width="140" />
 </p>
 
 <h1 align="center">BunkerVM</h1>
