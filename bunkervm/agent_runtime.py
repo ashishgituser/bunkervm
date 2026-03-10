@@ -7,9 +7,9 @@ One line to make any agent secure.
 Usage:
     from bunkervm import secure_agent
 
-    # LangGraph / LangChain
-    from langgraph.prebuilt import create_react_agent
-    agent = secure_agent(create_react_agent(model, tools))
+    # LangChain / LangGraph
+    from langchain.agents import create_agent
+    agent = secure_agent(create_agent(model, tools))
 
     # Or wrap any callable
     agent = secure_agent(my_agent_function)
@@ -172,7 +172,7 @@ class SecureAgentRuntime:
         Usage:
             runtime = SecureAgentRuntime()
             tool = runtime.as_tool()
-            agent = create_react_agent(model, [tool])
+            agent = create_agent(model, [tool])
         """
         try:
             from langchain_core.tools import tool as lc_tool
@@ -259,7 +259,7 @@ def secure_agent(
     Usage:
         # Wrap a LangGraph agent
         from bunkervm import secure_agent
-        safe = secure_agent(create_react_agent(model, tools))
+        safe = secure_agent(create_agent(model, tools))
         result = safe.invoke({"messages": [...]})
 
         # Or get a runtime directly (no agent)

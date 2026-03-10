@@ -838,7 +838,7 @@
             <div class="reveal">
                 <div class="hero-badge">
                     <span class="dot"></span>
-                    v0.3.0 — Now on PyPI
+                    v0.6.0 — Now on PyPI
                 </div>
             </div>
 
@@ -1063,8 +1063,8 @@
     <section>
         <div class="container">
             <div class="section-label reveal">Compatibility</div>
-            <h2 class="reveal">Works with any MCP client</h2>
-            <p class="section-desc reveal">BunkerVM speaks the <a href="https://modelcontextprotocol.io" target="_blank" style="color: var(--accent-light); text-decoration: none;">Model Context Protocol</a>.</p>
+            <h2 class="reveal">Native integrations + MCP</h2>
+            <p class="section-desc reveal">Native toolkits for LangChain, OpenAI, and CrewAI. Plus full <a href="https://modelcontextprotocol.io" target="_blank" style="color: var(--accent-light); text-decoration: none;">MCP</a> support for any compatible client.</p>
 
             <div class="compat-row reveal">
                 <div class="compat-chip"><span class="chip-dot"></span> Claude Desktop</div>
@@ -1101,70 +1101,161 @@
         </div>
     </section>
 
-    <!-- LangGraph Integration -->
+    <!-- Framework Integrations -->
     <section id="langgraph">
         <div class="container">
             <div class="section-label reveal">Integration</div>
-            <h2 class="reveal">Works with every major framework</h2>
-            <p class="section-desc reveal">LangGraph, OpenAI Agents SDK, CrewAI — install the extras, import the toolkit. Every tool call is logged.</p>
+            <h2 class="reveal">Works with every major AI framework</h2>
+            <p class="section-desc reveal">Install the extras, import the toolkit, get <strong>6 sandboxed tools</strong>. Every tool call runs inside a hardware-isolated VM &mdash; identical behaviour across all frameworks.</p>
 
-            <div class="setup-card reveal" style="max-width: 700px;">
-                <div class="setup-card-header">
-                    <span class="os-icon">&#129302;</span>
-                    <span>examples/test_agent.py</span>
+            <!-- Tools chips -->
+            <div class="reveal" style="margin-bottom: 32px;">
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+                    <span style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--cyan);">run_command</span>
+                    <span style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--cyan);">write_file</span>
+                    <span style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--cyan);">read_file</span>
+                    <span style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--cyan);">list_directory</span>
+                    <span style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--cyan);">upload_file</span>
+                    <span style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--cyan);">download_file</span>
                 </div>
-                <pre><span class="key">from</span> langchain_openai <span class="key">import</span> ChatOpenAI
-<span class="key">from</span> langgraph.prebuilt <span class="key">import</span> create_react_agent
-<span class="key">from</span> bunkervm.langchain <span class="key">import</span> BunkerVMToolkit
-
-toolkit = BunkerVMToolkit()  <span class="str"># auto-connects to running VM</span>
-agent = create_react_agent(ChatOpenAI(<span class="str">model="gpt-4o"</span>), toolkit.get_tools())
-
-result = agent.invoke({
-    <span class="str">"messages"</span>: [(<span class="str">"human"</span>, <span class="str">"Write a script that finds primes under 50, run it"</span>)]
-})</pre>
             </div>
 
-            <div class="setup-cards reveal" style="margin-top: 24px;">
+            <!-- LangChain -->
+            <div class="setup-card reveal" style="max-width: 740px;">
+                <div class="setup-card-header">
+                    <span class="os-icon">&#129302;</span>
+                    <span>LangChain / LangGraph</span>
+                </div>
+                <pre style="font-size: 0.78rem;"><span style="color: var(--text-muted);">$ pip install bunkervm[langgraph] langchain-openai</span>
+
+<span class="key">from</span> langchain_openai <span class="key">import</span> ChatOpenAI
+<span class="key">from</span> langchain.agents <span class="key">import</span> create_agent
+<span class="key">from</span> bunkervm.langchain <span class="key">import</span> BunkerVMToolkit
+
+toolkit = BunkerVMToolkit()  <span class="str"># boots a Firecracker VM (~3s)</span>
+
+agent = create_agent(
+    ChatOpenAI(<span class="str">model="gpt-4o"</span>),
+    tools=toolkit.get_tools(),  <span class="str"># 6 sandbox tools</span>
+)
+result = agent.invoke({
+    <span class="str">"messages"</span>: [(<span class="str">"user"</span>, <span class="str">"Find all primes under 100, save &amp; run the script"</span>)]
+})
+toolkit.stop()  <span class="str"># destroy VM</span></pre>
+            </div>
+
+            <!-- LangGraph output -->
+            <div class="reveal" style="margin-top: 12px; max-width: 740px;">
+                <details>
+                    <summary style="cursor: pointer; color: var(--accent-light); font-family: 'Inter', sans-serif; font-size: 0.9rem; padding: 8px 0;">&#9654; See agent execution output</summary>
+                    <pre style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; line-height: 1.8; color: var(--text-muted); margin-top: 8px;">&#128274; BunkerVM + LangGraph Agent Demo
+=============================================
+
+&#9203; Booting sandbox VM...
+&#9989; Sandbox ready
+
+Prompt: Write a Python script that finds all prime numbers under 100,
+        save it to /tmp/primes.py, run it, and show me the output.
+
+<span style="color: var(--cyan);">&#8594; write_file: /tmp/primes.py (312 bytes)</span>
+  &#8592; wrote 312 bytes
+<span style="color: var(--cyan);">&#8594; run_command: python3 /tmp/primes.py</span>
+  <span style="color: var(--green);">&#8592; OK (42ms, 89 bytes)</span>
+
+<span style="color: #f472b6;">&#129302; [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47,
+    53, 59, 61, 67, 71, 73, 79, 83, 89, 97]</span>
+
+&#129529; Sandbox destroyed.</pre>
+                </details>
+            </div>
+
+            <!-- OpenAI + CrewAI side by side -->
+            <div class="setup-cards reveal" style="margin-top: 32px;">
+                <!-- OpenAI Agents SDK -->
                 <div class="setup-card">
                     <div class="setup-card-header">
                         <span class="os-icon">&#128161;</span>
                         <span>OpenAI Agents SDK</span>
                     </div>
-                    <pre><span class="key">from</span> agents <span class="key">import</span> Agent, Runner
+                    <pre style="font-size: 0.78rem;"><span style="color: var(--text-muted);">$ pip install bunkervm[openai-agents]</span>
+
+<span class="key">from</span> agents <span class="key">import</span> Agent, Runner
 <span class="key">from</span> bunkervm.openai_agents <span class="key">import</span> BunkerVMTools
 
+tools = BunkerVMTools()  <span class="str"># boots VM</span>
 agent = Agent(
     name=<span class="str">"coder"</span>,
-    tools=BunkerVMTools().get_tools(),
+    instructions=<span class="str">"Run code in a secure VM."</span>,
+    tools=tools.get_tools(),
 )
-result = Runner.run_sync(agent, <span class="str">"Find primes under 50"</span>)</pre>
+result = Runner.run_sync(agent,
+  <span class="str">"First 20 Fibonacci numbers"</span>)
+tools.stop()</pre>
                 </div>
+                <!-- CrewAI -->
                 <div class="setup-card">
                     <div class="setup-card-header">
                         <span class="os-icon">&#9881;&#65039;</span>
                         <span>CrewAI</span>
                     </div>
-                    <pre><span class="key">from</span> crewai <span class="key">import</span> Agent, Task, Crew
+                    <pre style="font-size: 0.78rem;"><span style="color: var(--text-muted);">$ pip install bunkervm[crewai]</span>
+
+<span class="key">from</span> crewai <span class="key">import</span> Agent, Task, Crew
 <span class="key">from</span> bunkervm.crewai <span class="key">import</span> BunkerVMCrewTools
 
+tools = BunkerVMCrewTools()  <span class="str"># boots VM</span>
 coder = Agent(
     role=<span class="str">"Engineer"</span>,
-    tools=BunkerVMCrewTools().get_tools(),
+    goal=<span class="str">"Write &amp; test code safely"</span>,
+    tools=tools.get_tools(),
 )
-Crew(agents=[coder], tasks=[task]).kickoff()</pre>
+Crew(agents=[coder], tasks=[task]).kickoff()
+tools.stop()</pre>
                 </div>
             </div>
 
-            <div style="margin-top: 24px;">
-                <pre style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.9; max-width: 700px; color: var(--text-muted);">$ pip install bunkervm<span style="color: var(--green);">[all]</span>  <span style="color: var(--text-muted);"># LangGraph + OpenAI + CrewAI</span>
+            <!-- Agent output cards side by side -->
+            <div class="setup-cards reveal" style="margin-top: 16px;">
+                <div class="setup-card" style="flex: 1;">
+                    <div class="setup-card-header">
+                        <span class="os-icon">&#128161;</span>
+                        <span>OpenAI SDK &mdash; Output</span>
+                    </div>
+                    <pre style="font-size: 0.72rem; line-height: 1.7; color: var(--text-muted);">&#9203; Booting sandbox VM... &#9989; ready
 
-<span style="color: var(--cyan);">→ write_file: /tmp/primes.py</span>
-  ← wrote 312 bytes
-<span style="color: var(--cyan);">→ run_command: python3 /tmp/primes.py</span>
-  <span style="color: var(--green);">← 2 3 5 7 11 13 17 19 23 29 31 37 41 43 47</span>
+<span style="color: var(--cyan);">&#8594; write_file: /tmp/fib.py</span>  &#8592; 198 bytes
+<span style="color: var(--cyan);">&#8594; run_command: python3 /tmp/fib.py</span>
+  <span style="color: var(--green);">&#8592; OK (38ms)</span>
 
-<span style="color: #f472b6;">🤖 The prime numbers under 50 are: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47.</span></pre>
+<span style="color: #f472b6;">&#129302; 0, 1, 1, 2, 3, 5, 8, 13, 21, 34,
+   55, 89, 144, 233, 377, 610, 987,
+   1597, 2584, 4181</span>
+
+&#129529; Sandbox destroyed.</pre>
+                </div>
+                <div class="setup-card" style="flex: 1;">
+                    <div class="setup-card-header">
+                        <span class="os-icon">&#9881;&#65039;</span>
+                        <span>CrewAI &mdash; Output</span>
+                    </div>
+                    <pre style="font-size: 0.72rem; line-height: 1.7; color: var(--text-muted);">&#9203; Booting sandbox VM... &#9989; ready
+
+&#128295; write_file <span style="color: var(--green);">&#9989;</span> 403 bytes &#8594; /tmp/sort.py
+&#128295; run_command <span style="color: var(--green);">&#9989;</span> python3 /tmp/sort.py
+
+<span style="color: var(--green);">Original: [83, 11, 25, 19, 86,
+          52, 97, 5, 70, 69]
+Sorted:   [5, 11, 19, 25, 52,
+          69, 70, 83, 86, 97]</span>
+
+&#129529; Sandbox destroyed.</pre>
+                </div>
+            </div>
+
+            <!-- Install all -->
+            <div style="margin-top: 28px; text-align: center;">
+                <pre style="display: inline-block; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 28px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-muted);">$ pip install bunkervm<span style="color: var(--green);">[all]</span>      <span style="color: var(--text-muted);"># LangChain + OpenAI + CrewAI</span></pre>
+                <p style="margin-top: 12px; font-size: 0.85rem; color: var(--text-muted);">Full working examples: <a href="https://github.com/ashishgituser/bunkervm/tree/main/examples" target="_blank" style="color: var(--accent-light); text-decoration: none;">examples/</a></p>
             </div>
         </div>
     </section>
@@ -1219,8 +1310,8 @@ Crew(agents=[coder], tasks=[task]).kickoff()</pre>
                 lines: [
                     { type: 'cmd', prompt: '$ ', text: 'pip install bunkervm[langgraph]' },
                     { type: 'output', text: 'Collecting bunkervm[langgraph]' },
-                    { type: 'output', text: '  Downloading bunkervm-0.3.0.tar.gz (48 kB)' },
-                    { type: 'success', text: 'Successfully installed bunkervm-0.3.0' },
+                    { type: 'output', text: '  Downloading bunkervm-0.5.0.tar.gz (52 kB)' },
+                    { type: 'success', text: 'Successfully installed bunkervm-0.5.0' },
                     { type: 'output', text: '' },
                     { type: 'cmd', prompt: '$ ', text: 'sudo python3 -m bunkervm &' },
                     { type: 'info', text: '⚡ Downloading BunkerVM bundle (first run)...' },
@@ -1234,17 +1325,17 @@ Crew(agents=[coder], tasks=[task]).kickoff()</pre>
                 label: 'AI Agent',
                 lines: [
                     { type: 'cmd', prompt: '>>> ', text: 'from bunkervm.langchain import BunkerVMToolkit' },
-                    { type: 'cmd', prompt: '>>> ', text: 'from langgraph.prebuilt import create_react_agent' },
-                    { type: 'cmd', prompt: '>>> ', text: 'agent = create_react_agent(llm, BunkerVMToolkit().get_tools())' },
+                    { type: 'cmd', prompt: '>>> ', text: 'from langchain.agents import create_agent' },
+                    { type: 'cmd', prompt: '>>> ', text: 'agent = create_agent(llm, BunkerVMToolkit().get_tools())' },
                     { type: 'output', text: '' },
-                    { type: 'cmd', prompt: '>>> ', text: 'agent.invoke({"messages": [("human",' },
+                    { type: 'cmd', prompt: '>>> ', text: 'agent.invoke({"messages": [("user",' },
                     { type: 'cmd', prompt: '... ', text: '  "Write a prime finder, save to /tmp/primes.py, run it")]})' },
                     { type: 'output', text: '' },
                     { type: 'arrow', text: '→ write_file: /tmp/primes.py' },
                     { type: 'output', text: '  ← wrote 312 bytes' },
                     { type: 'arrow', text: '→ run_command: python3 /tmp/primes.py' },
-                    { type: 'success', text: '  ← 2 3 5 7 11 13 17 19 23 29 31 37 41 43 47' },
-                    { type: 'agent', text: '🤖 Found 15 primes under 50.' },
+                    { type: 'success', text: '  ← [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]' },
+                    { type: 'agent', text: '🤖 Found 25 primes under 100.' },
                 ],
             },
             {

@@ -137,74 +137,213 @@ print(result)
 runtime.stop()
 ```
 
-### With LangGraph / LangChain
+---
+
+## Framework Integrations
+
+Every integration auto-boots a Firecracker VM and gives your agent **6 sandboxed tools**:
+
+| Tool | What it does |
+|---|---|
+| `run_command` | Execute any shell command inside the VM |
+| `write_file` | Create / overwrite a file inside the VM |
+| `read_file` | Read a file from the VM |
+| `list_directory` | List files and folders in the VM |
+| `upload_file` | Upload a file from host → VM |
+| `download_file` | Download a file from VM → host |
+
+All toolkits share the same `BunkerVMToolsBase` — identical behaviour regardless of framework.
+
+### LangChain / LangGraph
 
 ```bash
-pip install bunkervm[langgraph]
+pip install bunkervm[langgraph] langchain-openai python-dotenv
 ```
 
 ```python
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from bunkervm.langchain import BunkerVMToolkit
 
-toolkit = BunkerVMToolkit()   # auto-boots a Firecracker VM
+toolkit = BunkerVMToolkit()   # boots a Firecracker VM (~3s)
 
-agent = create_react_agent(
+agent = create_agent(
     ChatOpenAI(model="gpt-4o"),
-    tools=toolkit.get_tools(),  # run_command, write_file, read_file, ...
+    tools=toolkit.get_tools(),  # 6 sandbox tools
 )
 result = agent.invoke({
-    "messages": [("user", "Write a Python script that finds primes under 50, then run it")]
+    "messages": [("user", "Write a Python script that finds primes under 100, then run it")]
 })
 
 toolkit.stop()   # destroy VM
 ```
 
-### With OpenAI Agents SDK
+> **Context manager** — `BunkerVMToolkit` supports `with` blocks:
+> ```python
+> with BunkerVMToolkit() as toolkit:
+>     agent = create_agent(llm, toolkit.get_tools())
+>     agent.invoke(...)
+> # VM auto-destroyed on exit
+> ```
+
+<details>
+<summary>Agent execution output</summary>
+
+```
+🔒 BunkerVM + LangGraph Agent Demo
+=============================================
+
+⏳ Booting sandbox VM...
+✅ Sandbox ready
+
+Prompt: Write a Python script that finds all prime numbers under 100,
+        save it to /tmp/primes.py, run it, and show me the output.
+
+→ write_file: /tmp/primes.py (312 bytes)
+  ← wrote 312 bytes
+→ run_command: python3 /tmp/primes.py
+  ← OK (42ms, 89 bytes)
+
+🤖 The Python script was executed successfully, and here is the list of
+   all prime numbers under 100:
+
+   [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47,
+    53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
+
+🧹 Sandbox destroyed.
+```
+
+</details>
+<br>
+
+### OpenAI Agents SDK
 
 ```bash
-pip install bunkervm[openai-agents]
+pip install bunkervm[openai-agents] python-dotenv
 ```
 
 ```python
 from agents import Agent, Runner
 from bunkervm.openai_agents import BunkerVMTools
 
-tools = BunkerVMTools()   # auto-boots a Firecracker VM
+tools = BunkerVMTools()   # boots a Firecracker VM (~3s)
 
 agent = Agent(
     name="coder",
     instructions="You write and run code inside a secure VM.",
-    tools=tools.get_tools(),
+    tools=tools.get_tools(),  # 6 sandbox tools
 )
 
-result = Runner.run_sync(agent, "Calculate the first 20 fibonacci numbers")
+result = Runner.run_sync(agent, "Calculate the first 20 Fibonacci numbers")
 print(result.final_output)
 tools.stop()
 ```
 
-### With CrewAI
+<details>
+<summary>Agent execution output</summary>
+
+```
+🔒 BunkerVM + OpenAI Agents SDK Demo
+=============================================
+
+⏳ Booting sandbox VM...
+✅ Sandbox ready
+
+Prompt: Write a Python script that generates the first 20 Fibonacci numbers,
+        save it to /tmp/fib.py, run it, and show me the output.
+
+→ write_file: /tmp/fib.py (198 bytes)
+  ← wrote 198 bytes
+→ run_command: python3 /tmp/fib.py
+  ← OK (38ms, 76 bytes)
+
+🤖 The script was executed successfully. The first 20 Fibonacci numbers are:
+
+   0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377,
+   610, 987, 1597, 2584, 4181
+
+🧹 Sandbox destroyed.
+```
+
+</details>
+<br>
+
+### CrewAI
 
 ```bash
-pip install bunkervm[crewai]
+pip install bunkervm[crewai] python-dotenv
 ```
 
 ```python
 from crewai import Agent, Task, Crew
 from bunkervm.crewai import BunkerVMCrewTools
 
-tools = BunkerVMCrewTools()   # auto-boots a Firecracker VM
+tools = BunkerVMCrewTools()   # boots a Firecracker VM (~3s)
 
 coder = Agent(
     role="Software Engineer",
     goal="Write and test code inside a secure sandbox",
-    tools=tools.get_tools(),
+    tools=tools.get_tools(),  # 6 sandbox tools
 )
-task = Task(description="Write a web scraper for Hacker News", agent=coder)
+task = Task(
+    description="Write a bubble sort script and run it",
+    agent=coder,
+    expected_output="The sorted list of numbers",
+)
 Crew(agents=[coder], tasks=[task]).kickoff()
 tools.stop()
 ```
+
+<details>
+<summary>Agent execution output</summary>
+
+```
+🔒 BunkerVM + CrewAI Demo
+=============================================
+
+⏳ Booting sandbox VM...
+✅ Sandbox ready
+
+╭──── 🚀 Crew Execution Started ────╮
+│  Name: crew                       │
+╰───────────────────────────────────╯
+
+╭──── 📋 Task Started ────╮
+│  Write a Python script that sorts a list of 10 random numbers  │
+│  using bubble sort. Save it to /tmp/sort.py, run it.           │
+╰────────────────────────╯
+
+🔧 Tool: write_file
+   Args: {path: /tmp/sort.py, content: "..."}
+   ✅ Wrote 403 bytes to /tmp/sort.py
+
+🔧 Tool: run_command
+   Args: {command: python3 /tmp/sort.py}
+   ✅ Original list: [83, 11, 25, 19, 86, 52, 97, 5, 70, 69]
+      Sorted list:   [5, 11, 19, 25, 52, 69, 70, 83, 86, 97]
+
+╭──── ✅ Agent Final Answer ────╮
+│  Original list: [83, 11, 25, 19, 86, 52, 97, 5, 70, 69]  │
+│  Sorted list:   [5, 11, 19, 25, 52, 69, 70, 83, 86, 97]  │
+╰───────────────────────────────╯
+
+🤖 Result: Sorted list: [5, 11, 19, 25, 52, 69, 70, 83, 86, 97]
+
+🧹 Sandbox destroyed.
+```
+
+</details>
+<br>
+
+### All extras
+
+```bash
+pip install bunkervm[all]    # LangChain + OpenAI Agents SDK + CrewAI
+```
+
+> Full working examples for each framework: [`examples/`](examples/)
+
+---
 
 ### With Claude Desktop (MCP)
 

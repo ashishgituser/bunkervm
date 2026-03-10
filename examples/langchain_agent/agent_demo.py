@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from bunkervm.langchain import BunkerVMToolkit
 
 
@@ -33,8 +33,8 @@ def main():
     toolkit = BunkerVMToolkit()
     print("✅ Sandbox ready\n")
 
-    # 2. Wire tools into a LangGraph ReAct agent
-    agent = create_react_agent(
+    # 2. Wire tools into a LangChain ReAct agent
+    agent = create_agent(
         ChatOpenAI(model="gpt-4o"),
         tools=toolkit.get_tools(),
     )

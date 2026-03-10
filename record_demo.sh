@@ -128,16 +128,16 @@ from dotenv import load_dotenv
 load_dotenv(os.path.expanduser('~/.env'))
 
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from bunkervm.langchain import BunkerVMToolkit
 
 toolkit = BunkerVMToolkit()
-agent = create_react_agent(ChatOpenAI(model='gpt-4o', temperature=0), toolkit.get_tools())
+agent = create_agent(ChatOpenAI(model='gpt-4o', temperature=0), toolkit.get_tools())
 
 task = 'Write a Python script that finds prime numbers under 50, save it to /tmp/primes.py, run it, show results.'
 print(f'\n  Task: \"{task}\"\n')
 
-result = agent.invoke({'messages': [('human', task)]})
+result = agent.invoke({'messages': [('user', task)]})
 
 for msg in result['messages']:
     if hasattr(msg, 'tool_calls') and msg.tool_calls:

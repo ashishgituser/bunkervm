@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from bunkervm.langchain import BunkerVMToolkit
 
 
@@ -34,7 +34,7 @@ def main():
     # 1. Create toolkit (auto-boots a Firecracker VM with full sandbox tools)
     toolkit = BunkerVMToolkit()
 
-    agent = create_react_agent(
+    agent = create_agent(
         ChatOpenAI(model="gpt-4o"),
         tools=toolkit.get_tools(),
     )

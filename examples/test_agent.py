@@ -25,7 +25,7 @@ logging.basicConfig(
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 
 from bunkervm.langchain import BunkerVMToolkit
 
@@ -33,7 +33,7 @@ load_dotenv()
 
 # ── Setup: 2 lines ──
 toolkit = BunkerVMToolkit()  # auto-connects to running VM
-agent = create_react_agent(
+agent = create_agent(
     ChatOpenAI(model="gpt-4o", temperature=0),
     toolkit.get_tools(),
 )

@@ -4,11 +4,11 @@ BunkerVM LangChain/LangGraph Integration — drop-in secure sandbox tools.
 Usage (auto-boot — zero config):
     from bunkervm.langchain import BunkerVMToolkit
     from langchain_openai import ChatOpenAI
-    from langgraph.prebuilt import create_react_agent
+    from langchain.agents import create_agent
 
     toolkit = BunkerVMToolkit()          # auto-boots a Firecracker VM
-    agent = create_react_agent(ChatOpenAI(model="gpt-4o"), toolkit.get_tools())
-    result = agent.invoke({"messages": [("human", "Write and run hello.py")]})
+    agent = create_agent(ChatOpenAI(model="gpt-4o"), toolkit.get_tools())
+    result = agent.invoke({"messages": [("user", "Write and run hello.py")]})
     toolkit.stop()                       # destroy VM when done
 
 Usage (attach to running VM):
@@ -51,7 +51,7 @@ class BunkerVMToolkit(BunkerVMToolsBase):
     def get_tools(self) -> list:
         """Return LangChain-compatible tools bound to this VM.
 
-        Returns a list of tools ready to pass to ``create_react_agent()``,
+        Returns a list of tools ready to pass to ``create_agent()``,
         ``ToolNode()``, or ``bind_tools()``.
 
         Requires ``langchain-core`` to be installed.
