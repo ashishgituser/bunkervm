@@ -233,27 +233,27 @@ bunkervm vscode-setup
 
 That's it. Reload VS Code (`Ctrl+Shift+P` → "Reload Window"). Copilot Chat now has 8 sandboxed tools.
 
-### Enable internet inside the VM (optional, one-time)
+> **Windows users:** These commands run in your normal PowerShell terminal.
+> `vscode-setup` auto-detects Windows, creates an isolated Python environment inside WSL,
+> installs BunkerVM there, and generates the correct config. You don't need to touch WSL directly.
 
-By default the VM has no internet. To enable it:
+### Enable internet inside the VM (optional)
 
 ```bash
-# Linux / WSL:
-sudo bunkervm enable-network
-
-# Windows:
-wsl -d Ubuntu -- sudo bunkervm enable-network
+bunkervm enable-network
 ```
 
-Then re-run `bunkervm vscode-setup` to update the config.
+On Windows this auto-proxies into WSL and prompts for your Linux password.
+On Linux, prefix with `sudo`.
 
 ### How it works
 
 1. `bunkervm vscode-setup` generates `.vscode/mcp.json` — auto-detects your OS
-2. VS Code starts BunkerVM as an MCP server
-3. A Firecracker microVM boots (~3s) with its own Linux kernel
-4. Copilot Chat gets 8 tools: `sandbox_exec`, `sandbox_write_file`, `sandbox_read_file`, `sandbox_list_dir`, `sandbox_upload_file`, `sandbox_download_file`, `sandbox_status`, `sandbox_reset`
-5. When Copilot writes code → it runs inside the VM → your host is never touched
+2. On Windows: creates `~/.bunkervm/venv` inside WSL, installs BunkerVM there automatically
+3. VS Code starts BunkerVM as an MCP server (via WSL on Windows, directly on Linux)
+4. A Firecracker microVM boots (~3s) with its own Linux kernel
+5. Copilot Chat gets 8 tools: `sandbox_exec`, `sandbox_write_file`, `sandbox_read_file`, `sandbox_list_dir`, `sandbox_upload_file`, `sandbox_download_file`, `sandbox_status`, `sandbox_reset`
+6. When Copilot writes code → it runs inside the VM → your host is never touched
 
 ### Try it
 
@@ -271,20 +271,20 @@ Linux:
 {
   "servers": {
     "bunkervm": {
-      "command": "python3",
-      "args": ["-m", "bunkervm"]
+      "command": "/usr/local/bin/bunkervm",
+      "args": ["server", "--stdio"]
     }
   }
 }
 ```
 
-Windows (auto-detected, wraps via WSL2):
+Windows (auto-detected — installs in WSL venv automatically):
 ```json
 {
   "servers": {
     "bunkervm": {
       "command": "wsl",
-      "args": ["-d", "Ubuntu", "--", "python3", "-m", "bunkervm"]
+      "args": ["-d", "Ubuntu", "--", "/home/you/.bunkervm/venv/bin/bunkervm", "server", "--stdio"]
     }
   }
 }

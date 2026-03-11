@@ -267,22 +267,97 @@ def cmd_info(args: argparse.Namespace) -> int:
 _SUDOERS_FILE = "/etc/sudoers.d/bunkervm"
 
 
+def _get_wsl_distro() -> str:
+    """Get the current WSL distro name, or 'Ubuntu' as fallback."""
+    return os.environ.get("WSL_DISTRO_NAME", "Ubuntu")
+
+
+def _is_wsl() -> bool:
+    """Detect if running inside WSL."""
+    if sys.platform == "win32":
+        return False
+    try:
+        import platform
+        return "microsoft" in platform.uname().release.lower()
+    except Exception:
+        return False
+
+
+def _is_windows_workspace() -> bool:
+    """Detect if cwd is a Windows-mounted path inside WSL (e.g. /mnt/c/...)."""
+    return _is_wsl() and os.getcwd().startswith("/mnt/")
+
+
+_WSL_VENV = "~/.bunkervm/venv"  # venv path inside WSL
+
+
+def _wsl_run(distro: str, *args: str, timeout: int = 120) -> "subprocess.CompletedProcess":
+    """Run a command inside WSL and return the result."""
+    import subprocess
+    return subprocess.run(
+        ["wsl", "-d", distro, "--", *args],
+        capture_output=True, text=True, timeout=timeout,
+    )
+
+
+def _ensure_bunkervm_in_wsl(distro: str) -> str:
+    """Ensure BunkerVM is installed in a WSL venv. Returns the bunkervm binary path."""
+    import subprocess
+
+    # Get the WSL user's home dir (don't use os.path.expanduser — that's Windows)
+    result = _wsl_run(distro, "bash", "-lc", "echo $HOME", timeout=10)
+    if result.returncode != 0:
+        _print(f"  {_CROSS} Cannot determine WSL home directory")
+        return ""
+    wsl_home = result.stdout.strip()
+
+    venv_dir = f"{wsl_home}/.bunkervm/venv"
+    bunkervm_bin = f"{venv_dir}/bin/bunkervm"
+
+    # Check if already installed
+    result = _wsl_run(distro, "test", "-f", bunkervm_bin)
+    if result.returncode == 0:
+        _print(f"  {_CHECK} BunkerVM in WSL: {_CYAN}{bunkervm_bin}{_RESET}")
+        return bunkervm_bin
+
+    # Need to create venv and install
+    _print(f"  {_ARROW} Installing BunkerVM in WSL ({distro})...")
+
+    # Create venv
+    result = _wsl_run(distro, "python3", "-m", "venv", venv_dir)
+    if result.returncode != 0:
+        _print(f"  {_CROSS} Failed to create venv: {result.stderr.strip()}")
+        _print(f"  {_DIM}Try: wsl -d {distro} -- sudo apt install python3-venv{_RESET}")
+        return ""
+
+    # Install bunkervm
+    pip_bin = f"{venv_dir}/bin/pip"
+    result = _wsl_run(distro, pip_bin, "install", "bunkervm")
+    if result.returncode != 0:
+        _print(f"  {_CROSS} pip install failed: {result.stderr.strip()}")
+        return ""
+
+    # Verify
+    result = _wsl_run(distro, "test", "-f", bunkervm_bin, timeout=10)
+    if result.returncode != 0:
+        _print(f"  {_CROSS} Installation succeeded but binary not found at {bunkervm_bin}")
+        return ""
+    _print(f"  {_CHECK} Installed BunkerVM in WSL: {_CYAN}{bunkervm_bin}{_RESET}")
+    return bunkervm_bin
+
+
 def _is_network_enabled() -> bool:
     """Check if passwordless sudo for networking commands is configured."""
+    import subprocess
     if sys.platform == "win32":
-        # On Windows, check via WSL
-        import subprocess
         try:
-            result = subprocess.run(
-                ["wsl", "-d", "Ubuntu", "--", "sudo", "-n", "ip", "link", "show"],
-                capture_output=True, timeout=5,
-            )
+            distro = _get_wsl_distro()
+            result = _wsl_run(distro, "sudo", "-n", "ip", "link", "show", timeout=5)
             return result.returncode == 0
         except Exception:
             return False
     else:
         try:
-            import subprocess
             result = subprocess.run(
                 ["sudo", "-n", "ip", "link", "show"],
                 capture_output=True, timeout=5,
@@ -295,7 +370,6 @@ def _is_network_enabled() -> bool:
 def cmd_vscode_setup(args: argparse.Namespace) -> int:
     """Generate .vscode/mcp.json for VS Code MCP integration."""
     import json
-    import platform
     import shutil
 
     workspace = os.getcwd()
@@ -305,32 +379,61 @@ def cmd_vscode_setup(args: argparse.Namespace) -> int:
     _print(f"\n{_BOLD}BunkerVM — VS Code MCP Setup{_RESET}\n")
 
     # Detect environment
-    is_wsl = "microsoft" in platform.uname().release.lower()
     is_windows = sys.platform == "win32"
-    python_bin = shutil.which("python3") or shutil.which("python") or "python3"
+    in_wsl = _is_wsl()
+    win_workspace = _is_windows_workspace()
 
-    if is_windows:
-        # Running from Windows — need WSL wrapper
+    # Determine if VS Code needs a WSL wrapper to reach BunkerVM.
+    # Case 1: Running on native Windows  → needs WSL wrapper
+    # Case 2: Running in WSL, cwd is /mnt/c/... → VS Code on Windows → needs WSL wrapper
+    # Case 3: Running in WSL, cwd is /home/... → VS Code Remote-WSL → direct
+    # Case 4: Native Linux → direct
+    needs_wsl_wrapper = is_windows or win_workspace
+
+    if needs_wsl_wrapper:
+        distro = _get_wsl_distro()
+        _print(f"  Platform:  {_CYAN}Windows + WSL2 ({distro}){_RESET}")
+
+        # Auto-install BunkerVM in WSL venv
+        bunkervm_bin = _ensure_bunkervm_in_wsl(distro)
+        if not bunkervm_bin:
+            return 1
+
         config = {
             "servers": {
                 "bunkervm": {
                     "command": "wsl",
-                    "args": ["-d", "Ubuntu", "--", "python3", "-m", "bunkervm", "--no-network"]
+                    "args": ["-d", distro, "--", bunkervm_bin, "server", "--stdio"]
                 }
             }
         }
-        _print(f"  Platform:  {_CYAN}Windows (using WSL2){_RESET}")
     else:
-        # Linux or WSL directly
-        config = {
-            "servers": {
-                "bunkervm": {
-                    "command": python_bin,
-                    "args": ["-m", "bunkervm", "--no-network"]
+        python_bin = shutil.which("python3") or shutil.which("python") or "python3"
+        bunkervm_bin = shutil.which("bunkervm")
+
+        if bunkervm_bin:
+            config = {
+                "servers": {
+                    "bunkervm": {
+                        "command": bunkervm_bin,
+                        "args": ["server", "--stdio"]
+                    }
                 }
             }
-        }
-        _print(f"  Platform:  {_CYAN}Linux{_RESET}")
+        else:
+            config = {
+                "servers": {
+                    "bunkervm": {
+                        "command": python_bin,
+                        "args": ["-m", "bunkervm", "server", "--stdio"]
+                    }
+                }
+            }
+
+        if in_wsl:
+            _print(f"  Platform:  {_CYAN}WSL2 (VS Code Remote){_RESET}")
+        else:
+            _print(f"  Platform:  {_CYAN}Linux{_RESET}")
 
     # Check if file already exists
     if os.path.exists(mcp_path):
@@ -360,10 +463,9 @@ def cmd_vscode_setup(args: argparse.Namespace) -> int:
     _print(f"  {_CHECK} Created {mcp_path}")
     _print()
     _print(f"  {_BOLD}What's next:{_RESET}")
-    _print(f"  1. Open this folder in VS Code")
-    _print(f"  2. Open Copilot Chat (Ctrl+Shift+I)")
-    _print(f"  3. Ask: {_CYAN}\"Run this Python script in the sandbox\"{_RESET}")
-    _print(f"  4. Copilot will use BunkerVM's 8 sandboxed tools automatically")
+    _print(f"  1. Reload VS Code ({_CYAN}Ctrl+Shift+P{_RESET} → \"Reload Window\")")
+    _print(f"  2. Open Copilot Chat ({_CYAN}Ctrl+Shift+I{_RESET})")
+    _print(f"  {_DIM}Ask: \"Run this Python script in the sandbox\"{_RESET}")
     _print()
     _print(f"  {_DIM}Tools: sandbox_exec, sandbox_write_file, sandbox_read_file,{_RESET}")
     _print(f"  {_DIM}       sandbox_list_dir, sandbox_upload_file, sandbox_download_file,{_RESET}")
@@ -380,12 +482,22 @@ def cmd_enable_network(args: argparse.Namespace) -> int:
     import subprocess
     import getpass
 
-    _print(f"\n{_BOLD}BunkerVM \u2014 Enable VM Networking{_RESET}\n")
+    _print(f"\n{_BOLD}BunkerVM — Enable VM Networking{_RESET}\n")
 
     if sys.platform == "win32":
-        _print(f"  {_YELLOW}! This command must be run inside WSL, not Windows.{_RESET}")
-        _print(f"  Run: {_CYAN}wsl -d Ubuntu -- sudo bunkervm enable-network{_RESET}\n")
-        return 1
+        # Auto-proxy to WSL — password prompt appears in this terminal
+        distro = _get_wsl_distro()
+        bunkervm_bin = _ensure_bunkervm_in_wsl(distro)
+        if not bunkervm_bin:
+            _print(f"  {_CROSS} BunkerVM not found in WSL. Run {_CYAN}bunkervm vscode-setup{_RESET} first.\n")
+            return 1
+
+        _print(f"  {_ARROW} Running in WSL ({distro})... enter your WSL password when prompted.\n")
+        result = subprocess.run(
+            ["wsl", "-d", distro, "--", "sudo", bunkervm_bin, "enable-network"],
+            timeout=60,
+        )
+        return result.returncode
 
     # Must be run as root
     if os.geteuid() != 0:

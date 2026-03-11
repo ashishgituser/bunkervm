@@ -1028,38 +1028,36 @@
         <div class="container">
             <div class="section-label reveal">New</div>
             <h2 class="reveal">VS Code + Copilot &mdash; 2 commands</h2>
-            <p class="section-desc reveal">Every line of code Copilot runs &mdash; <strong>hardware-isolated</strong>. No extensions to install. No config files to edit.</p>
+            <p class="section-desc reveal">Every line of code Copilot runs &mdash; <strong>hardware-isolated</strong>. No extensions to install. No WSL commands to learn.<br>
+            <span style="color: var(--text-muted); font-size: 0.9rem;">Works on Windows, Linux, and WSL. On Windows, <code>vscode-setup</code> auto-installs BunkerVM inside WSL for you.</span></p>
 
             <div class="setup-cards reveal">
                 <div class="setup-card" style="max-width: 100%; flex: 1;">
                     <div class="setup-card-header">
                         <span class="os-icon">&#9889;</span>
-                        <span>Setup (30 seconds)</span>
+                        <span>Setup &mdash; any platform, any terminal</span>
                     </div>
                     <pre style="font-size: 0.82rem;"><span style="color: var(--green);">$</span> pip install bunkervm
 <span style="color: var(--green);">$</span> bunkervm vscode-setup
 
-<span style="color: var(--green);">&#10003;</span> Created .vscode/mcp.json
-<span style="color: var(--text-muted);">  Platform: Windows (using WSL2)</span>
-<span style="color: var(--text-muted);">  Network:  enabled</span>
+  Platform:  <span style="color: var(--cyan);">Windows + WSL2 (Ubuntu)</span>
+  <span style="color: var(--green);">&#10003;</span> Installed BunkerVM in WSL: <span style="color: var(--cyan);">0.7.0</span>
+  <span style="color: var(--green);">&#10003;</span> Created .vscode/mcp.json
 
-<span style="color: var(--text-muted);">  What's next:</span>
-<span style="color: var(--text-muted);">  1. Reload VS Code (Ctrl+Shift+P &rarr; "Reload Window")</span>
-<span style="color: var(--text-muted);">  2. Open Copilot Chat (Ctrl+Shift+I)</span>
-<span style="color: var(--text-muted);">  3. Ask: "Run this Python script in the sandbox"</span></pre>
+<span style="color: var(--text-muted);">  Reload VS Code &rarr; Open Copilot Chat &rarr; Done.</span></pre>
                 </div>
             </div>
 
+            <p class="reveal" style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 14px;">
+                <strong style="color: var(--text);">Windows users:</strong> Just run these in PowerShell. <code>vscode-setup</code> creates an isolated Python venv inside WSL, installs BunkerVM there, and generates the config. You never touch WSL directly.
+            </p>
+
             <div class="reveal" style="margin-top: 28px; text-align: center;">
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">Want internet inside the VM? One-time setup:</p>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">Want internet inside the VM? One command:</p>
                 <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-                    <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;">
-                        <span style="color: var(--text-muted);"># Linux / WSL</span><br>
-                        <span style="color: var(--green);">$</span> <span style="color: var(--text);">sudo bunkervm enable-network</span>
-                    </div>
-                    <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;">
-                        <span style="color: var(--text-muted);"># Windows</span><br>
-                        <span style="color: var(--green);">$</span> <span style="color: var(--text);">wsl -d Ubuntu -- sudo bunkervm enable-network</span>
+                    <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;">
+                        <span style="color: var(--green);">$</span> <span style="color: var(--text);">bunkervm enable-network</span>
+                        <span style="color: var(--text-muted); font-size: 0.72rem;"> &nbsp;# auto-proxies to WSL on Windows</span>
                     </div>
                 </div>
             </div>
