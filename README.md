@@ -272,7 +272,7 @@ Linux:
   "servers": {
     "bunkervm": {
       "command": "/usr/local/bin/bunkervm",
-      "args": ["server", "--stdio"]
+      "args": ["server"]
     }
   }
 }
@@ -284,7 +284,7 @@ Windows (auto-detected — installs in WSL venv automatically):
   "servers": {
     "bunkervm": {
       "command": "wsl",
-      "args": ["-d", "Ubuntu", "--", "/home/you/.bunkervm/venv/bin/bunkervm", "server", "--stdio"]
+      "args": ["-d", "Ubuntu", "--", "/home/you/.bunkervm/venv/bin/bunkervm", "server"]
     }
   }
 }

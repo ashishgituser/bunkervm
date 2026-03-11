@@ -403,7 +403,7 @@ def cmd_vscode_setup(args: argparse.Namespace) -> int:
             "servers": {
                 "bunkervm": {
                     "command": "wsl",
-                    "args": ["-d", distro, "--", bunkervm_bin, "server", "--stdio"]
+                    "args": ["-d", distro, "--", bunkervm_bin, "server"]
                 }
             }
         }
@@ -416,7 +416,7 @@ def cmd_vscode_setup(args: argparse.Namespace) -> int:
                 "servers": {
                     "bunkervm": {
                         "command": bunkervm_bin,
-                        "args": ["server", "--stdio"]
+                        "args": ["server"]
                     }
                 }
             }
@@ -425,7 +425,7 @@ def cmd_vscode_setup(args: argparse.Namespace) -> int:
                 "servers": {
                     "bunkervm": {
                         "command": python_bin,
-                        "args": ["-m", "bunkervm", "server", "--stdio"]
+                        "args": ["-m", "bunkervm", "server"]
                     }
                 }
             }
