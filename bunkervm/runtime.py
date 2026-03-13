@@ -53,8 +53,9 @@ def run_code(
 ) -> str:
     """Run code inside a disposable BunkerVM sandbox.
 
-    Boots a Firecracker microVM, executes the code, returns stdout,
-    and destroys the VM. One function call. Zero config.
+    If a BunkerVM engine daemon is running (localhost:9551), the code
+    executes through the engine. Otherwise, boots a Firecracker microVM
+    directly (requires Linux with /dev/kvm).
 
     Args:
         code: Source code to execute.
@@ -76,6 +77,99 @@ def run_code(
         >>> run_code("print('Hello from BunkerVM!')")
         'Hello from BunkerVM!'
     """
+    # Try engine first (fast path — no Firecracker setup needed)
+    engine = _try_engine_discovery()
+    if engine is not None:
+        return _run_code_via_engine(
+            engine, code, language=language, timeout=timeout,
+            cpus=cpus, memory=memory, network=network, quiet=quiet,
+        )
+
+    # Fall back to direct Firecracker boot
+    return _run_code_direct(
+        code, language=language, timeout=timeout,
+        cpus=cpus, memory=memory, network=network, quiet=quiet,
+    )
+
+
+def _try_engine_discovery():
+    """Try to discover a running engine. Returns EngineClient or None."""
+    try:
+        from .engine.discovery import discover_engine
+        return discover_engine()
+    except Exception:
+        return None
+
+
+def _run_code_via_engine(
+    engine,
+    code: str,
+    *,
+    language: str,
+    timeout: int,
+    cpus: int,
+    memory: int,
+    network: bool,
+    quiet: bool,
+) -> str:
+    """Execute code through the engine daemon (no direct Firecracker)."""
+    if not quiet:
+        _print("Running via BunkerVM engine...")
+
+    # Create a disposable sandbox
+    sb_info = engine.create_sandbox(cpus=cpus, memory=memory, network=network)
+    sandbox_id = sb_info["id"]
+
+    try:
+        if not quiet:
+            _print("Running code inside sandbox...")
+
+        # Build the execution command
+        if language == "python":
+            engine.write_file(sandbox_id, "/tmp/_run.py", code)
+            result = engine.exec(sandbox_id, "python3 /tmp/_run.py", timeout=timeout)
+        elif language == "bash":
+            engine.write_file(sandbox_id, "/tmp/_run.sh", code)
+            result = engine.exec(sandbox_id, "bash /tmp/_run.sh", timeout=timeout)
+        elif language == "node":
+            engine.write_file(sandbox_id, "/tmp/_run.js", code)
+            result = engine.exec(sandbox_id, "node /tmp/_run.js", timeout=timeout)
+        else:
+            raise ValueError(f"Unsupported language: {language}")
+
+        stdout = result.get("stdout", "")
+        stderr = result.get("stderr", "")
+        exit_code = result.get("exit_code", -1)
+
+        if exit_code != 0:
+            error_msg = stderr.strip() or f"Code exited with status {exit_code}"
+            raise RuntimeError(f"Execution failed:\n{error_msg}")
+
+        return stdout.rstrip("\n")
+
+    finally:
+        # Always destroy the disposable sandbox
+        if not quiet:
+            _print("Destroying sandbox...")
+        try:
+            engine.destroy_sandbox(sandbox_id)
+        except Exception:
+            pass
+        if not quiet:
+            _print("Done.")
+
+
+def _run_code_direct(
+    code: str,
+    *,
+    language: str,
+    timeout: int,
+    cpus: int,
+    memory: int,
+    network: bool,
+    quiet: bool,
+) -> str:
+    """Execute code by directly booting a Firecracker VM (fallback path)."""
     from .config import load_config
     from .bootstrap import ensure_ready
     from .vm_manager import VMManager
@@ -153,8 +247,9 @@ def run_code(
 class Sandbox:
     """A reusable BunkerVM sandbox context manager.
 
-    Boots a VM once and allows multiple code executions.
-    VM is destroyed when the context exits.
+    If a BunkerVM engine daemon is running, the sandbox is created through
+    the engine (no direct Firecracker access needed). Otherwise, boots a
+    VM directly (requires Linux with /dev/kvm).
 
     Usage:
         with Sandbox() as sb:
@@ -167,6 +262,9 @@ class Sandbox:
         sb.start()
         sb.run("print('hello')")
         sb.stop()
+
+        # Explicitly use engine (skip auto-discovery):
+        sb = Sandbox(engine_url="http://localhost:9551")
     """
 
     def __init__(
@@ -176,55 +274,36 @@ class Sandbox:
         network: bool = True,
         timeout: int = 30,
         quiet: bool = False,
+        engine_url: Optional[str] = None,
     ):
         self._cpus = cpus
         self._memory = memory
         self._network = network
         self._timeout = timeout
         self._quiet = quiet
+        self._engine_url = engine_url  # explicit engine override
+        # Direct mode state
         self._vm: Optional[object] = None
         self._client: Optional[object] = None
+        # Engine mode state
+        self._engine: Optional[object] = None
+        self._engine_sandbox_id: Optional[str] = None
 
     def start(self) -> "Sandbox":
-        """Boot the sandbox VM."""
-        from .config import load_config
-        from .bootstrap import ensure_ready
-        from .vm_manager import VMManager
-        from .sandbox_client import SandboxClient
+        """Boot the sandbox VM.
 
-        if self._vm is not None:
+        Tries engine daemon first, then falls back to direct Firecracker.
+        """
+        if self._client is not None:
             return self
 
-        if not self._quiet:
-            _print("Starting BunkerVM sandbox...")
+        # Try engine mode first
+        engine = self._resolve_engine()
+        if engine is not None:
+            return self._start_via_engine(engine)
 
-        config = load_config()
-        config.vcpu_count = self._cpus
-        config.mem_size_mib = self._memory
-
-        bundle = ensure_ready()
-        config.firecracker_bin = bundle.firecracker
-        config.kernel_path = bundle.kernel
-        config.rootfs_path = bundle.rootfs
-
-        self._vm = VMManager(config, network=self._network)
-        self._vm.start()
-
-        self._client = SandboxClient(
-            vsock_uds=config.vsock_uds_path,
-            vsock_port=config.vm_port,
-        )
-        if not self._client.wait_for_health(timeout=config.health_timeout):
-            self._vm.stop()
-            self._vm = None
-            raise RuntimeError("Sandbox agent not responding")
-
-        # Install the persistent Python namespace runner
-        self._install_runner()
-
-        if not self._quiet:
-            _print("Sandbox ready.")
-        return self
+        # Fall back to direct Firecracker boot
+        return self._start_direct()
 
     def _install_runner(self) -> None:
         """Install a persistent-namespace runner script inside the VM.
@@ -276,11 +355,107 @@ class Sandbox:
             "if failed:\n"
             "    sys.exit(1)\n"
         )
+        # self._client handles routing: SandboxClient for direct mode,
+        # EngineBackedClient for engine mode — no need to branch here.
         self._client.write_file("/tmp/_runner.py", runner)
+
+    # ── Engine discovery and start helpers ──
+
+    def _resolve_engine(self):
+        """Try to get an EngineClient. Returns client or None."""
+        if self._engine_url:
+            from .engine.client import EngineClient
+            from .engine.discovery import parse_engine_url
+            host, port = parse_engine_url(self._engine_url)
+            return EngineClient(host=host, port=port)
+
+        # Auto-discovery
+        return _try_engine_discovery()
+
+    def _start_via_engine(self, engine) -> "Sandbox":
+        """Start sandbox through the engine daemon."""
+        from .engine.client import EngineBackedClient
+
+        if not self._quiet:
+            _print("Starting sandbox via BunkerVM engine...")
+
+        sb_info = engine.create_sandbox(
+            cpus=self._cpus,
+            memory=self._memory,
+            network=self._network,
+        )
+        self._engine = engine
+        self._engine_sandbox_id = sb_info["id"]
+
+        # EngineBackedClient wraps engine API calls with the same
+        # interface as SandboxClient — existing code works unchanged.
+        self._client = EngineBackedClient(
+            engine=engine,
+            sandbox_id=self._engine_sandbox_id,
+        )
+
+        # Install the persistent namespace runner
+        self._install_runner()
+
+        if not self._quiet:
+            _print("Sandbox ready (via engine).")
+        return self
+
+    def _start_direct(self) -> "Sandbox":
+        """Start sandbox by directly booting a Firecracker VM."""
+        from .config import load_config
+        from .bootstrap import ensure_ready
+        from .vm_manager import VMManager
+        from .sandbox_client import SandboxClient
+
+        if not self._quiet:
+            _print("Starting BunkerVM sandbox...")
+
+        config = load_config()
+        config.vcpu_count = self._cpus
+        config.mem_size_mib = self._memory
+
+        bundle = ensure_ready()
+        config.firecracker_bin = bundle.firecracker
+        config.kernel_path = bundle.kernel
+        config.rootfs_path = bundle.rootfs
+
+        self._vm = VMManager(config, network=self._network)
+        self._vm.start()
+
+        self._client = SandboxClient(
+            vsock_uds=config.vsock_uds_path,
+            vsock_port=config.vm_port,
+        )
+        if not self._client.wait_for_health(timeout=config.health_timeout):
+            self._vm.stop()
+            self._vm = None
+            raise RuntimeError("Sandbox agent not responding")
+
+        # Install the persistent Python namespace runner
+        self._install_runner()
+
+        if not self._quiet:
+            _print("Sandbox ready.")
+        return self
 
     def stop(self) -> None:
         """Destroy the sandbox VM."""
-        if self._vm is not None:
+        if self._engine is not None and self._engine_sandbox_id:
+            # Engine mode: destroy via engine API
+            if not self._quiet:
+                _print("Destroying sandbox...")
+            try:
+                self._engine.destroy_sandbox(self._engine_sandbox_id)
+            except Exception:
+                pass
+            self._engine = None
+            self._engine_sandbox_id = None
+            self._client = None
+            if not self._quiet:
+                _print("Done.")
+        elif self._vm is not None:
+            # Direct mode: stop the VM
             if not self._quiet:
                 _print("Destroying sandbox...")
             self._vm.stop()

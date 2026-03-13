@@ -288,7 +288,17 @@ class VMManager:
                 "    3. sudo chmod 666 /dev/kvm\n"
             )
 
-        # Check KVM permissions
+        # Check KVM permissions — try to auto-fix before raising error
+        if not os.access("/dev/kvm", os.R_OK | os.W_OK):
+            # Attempt auto-fix (passwordless sudo)
+            try:
+                subprocess.run(
+                    ["sudo", "-n", "chmod", "666", "/dev/kvm"],
+                    capture_output=True, timeout=5
+                )
+            except Exception:
+                pass
+
         if not os.access("/dev/kvm", os.R_OK | os.W_OK):
             raise VMError(
                 "\n╔══════════════════════════════════════════════════════╗\n"

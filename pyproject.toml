@@ -68,6 +68,9 @@ Issues = "https://github.com/ashishgituser/bunkervm/issues"
 [tool.setuptools.packages.find]
 include = ["bunkervm*"]
 
+[tool.setuptools.package-data]
+bunkervm = ["dashboard_assets/**"]
+
 [tool.black]
 line-length = 100
 target-version = ["py310"]

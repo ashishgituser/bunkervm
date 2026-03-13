@@ -1,9 +1,11 @@
-name: Build & Release BunkerVM Bundle
+name: Build & Release BunkerVM
 
-# Builds the pre-built BunkerVM bundle (our micro-OS + Firecracker + kernel)
-# so users just `pip install` and everything downloads automatically.
+# Builds:
+#   1. Linux bundle (Firecracker + kernel + rootfs)  — for `pip install bunkervm`
+#   2. Windows installer (BunkerDesktop.exe)          — for desktop users
+#   3. PyPI package
 #
-# Trigger: push a tag like v0.1.0
+# Trigger: push a tag like v0.7.2
 
 on:
   push:
@@ -12,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. v0.1.0)'
+        description: 'Release version (e.g. v0.7.2)'
         required: true
 
 permissions:
@@ -23,8 +25,11 @@ env:
   ALPINE_VERSION: "3.21"
 
 jobs:
+  # ─────────────────────────────────────────────────────────
+  #  Job 1: Build the Linux bundle (Firecracker + rootfs)
+  # ─────────────────────────────────────────────────────────
   build-bundle:
-    name: Build BunkerVM Bundle (x86_64)
+    name: Build Linux Bundle (x86_64)
     runs-on: ubuntu-latest
 
     steps:
@@ -48,8 +53,6 @@ jobs:
           mkdir -p /tmp/fc-extract
           curl -sL -o /tmp/fc.tgz "https://github.com/firecracker-microvm/firecracker/releases/download/${{ env.FC_VERSION }}/firecracker-${{ env.FC_VERSION }}-x86_64.tgz"
           tar xzf /tmp/fc.tgz -C /tmp/fc-extract
-          # Tarball contains: release-VERSION-ARCH/firecracker-VERSION-ARCH
-          # Exclude .debug, .json, .yaml files — we need the actual binary
           FC_BIN=$(find /tmp/fc-extract -name "firecracker-v*" -type f \
             ! -name "*.debug" ! -name "*.json" ! -name "*.yaml" | head -1)
           echo "Found firecracker binary: $FC_BIN"
@@ -57,44 +60,33 @@ jobs:
           chmod +x /tmp/firecracker
           file /tmp/firecracker
           ls -lh /tmp/firecracker
-          # Validate it actually runs
           /tmp/firecracker --version || { echo "ERROR: Firecracker binary does not run!"; exit 1; }
 
       - name: Download kernel
         run: |
-          # Firecracker CI kernels — dynamically find the latest available
           ARCH="x86_64"
-          FC_MINOR="${FC_VERSION%.*}"  # v1.11.0 -> v1.11
-          
-          # Try the CI bucket first (exclude .config files)
+          FC_MINOR="${FC_VERSION%.*}"
           KERNEL_KEY=$(curl -s "http://spec.ccfc.min.s3.amazonaws.com/?prefix=firecracker-ci/${FC_MINOR}/${ARCH}/vmlinux-&list-type=2" \
             | grep -oP '(?<=<Key>)(firecracker-ci/[^<]+vmlinux-[0-9][^<]*)' \
             | grep -v '\.config$' \
             | sort -V | tail -1)
-          
           if [ -n "$KERNEL_KEY" ]; then
             echo "Found kernel: $KERNEL_KEY"
             curl -sL -o /tmp/vmlinux "https://s3.amazonaws.com/spec.ccfc.min/${KERNEL_KEY}"
           else
-            # Fallback: build a minimal kernel or use a known good URL
             echo "CI bucket empty, trying quickstart path..."
             curl -sL -o /tmp/vmlinux "https://s3.amazonaws.com/spec.ccfc.min/img/quickstart_guide/${ARCH}/kernels/vmlinux-5.10.225"
           fi
-          
-          # Validate it's actually an ELF binary, not an XML error
           if ! file /tmp/vmlinux | grep -q "ELF"; then
             echo "ERROR: Downloaded kernel is not a valid ELF binary!"
             file /tmp/vmlinux
             head -c 200 /tmp/vmlinux
             exit 1
           fi
-          
           ls -lh /tmp/vmlinux
-          file /tmp/vmlinux
 
       - name: Build BunkerVM rootfs
         run: |
-          # Build our micro-OS (Alpine + Python + exec_agent)
           sudo bash build/build-sandbox-rootfs.sh
           ls -lh build/rootfs.ext4
 
@@ -104,13 +96,143 @@ jobs:
           cp /tmp/firecracker /tmp/bunkervm-bundle/
           cp /tmp/vmlinux /tmp/bunkervm-bundle/
           cp build/rootfs.ext4 /tmp/bunkervm-bundle/
-
-          # Add version metadata
           echo "{\"version\": \"$VERSION\", \"arch\": \"x86_64\"}" > /tmp/bunkervm-bundle/bundle.json
-
           cd /tmp
           tar czf bunkervm-bundle-x86_64.tar.gz -C bunkervm-bundle .
           ls -lh bunkervm-bundle-x86_64.tar.gz
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundle
+          path: /tmp/bunkervm-bundle-x86_64.tar.gz
+
+  # ─────────────────────────────────────────────────────────
+  #  Job 2: Build BunkerDesktop Windows Installer
+  # ─────────────────────────────────────────────────────────
+  build-desktop:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          pip install pyinstaller pywebview pythonnet clr-loader
+
+      - name: Build BunkerDesktop.exe (PyInstaller)
+        run: |
+          cd desktop
+          pyinstaller BunkerDesktop.spec --noconfirm
+          # Verify the exe was created
+          if (!(Test-Path "dist\BunkerDesktop.exe")) {
+            Write-Error "BunkerDesktop.exe was not created!"
+            exit 1
+          }
+          $size = [math]::Round((Get-Item "dist\BunkerDesktop.exe").Length / 1MB, 2)
+          Write-Host "BunkerDesktop.exe built: $size MB"
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y --no-progress
+          # Add to PATH for this step
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -Append -FilePath $env:GITHUB_PATH
+
+      - name: Build installer (Inno Setup)
+        run: |
+          # Pass version to Inno Setup via /D define
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DMyAppVersion="${{ env.VERSION }}" `
+            installer\windows\BunkerDesktopSetup.iss
+          # Verify
+          $installer = Get-ChildItem "installer\windows\Output\BunkerDesktopSetup-*.exe" | Select-Object -First 1
+          if (!$installer) {
+            Write-Error "Installer was not created!"
+            exit 1
+          }
+          $size = [math]::Round($installer.Length / 1MB, 2)
+          Write-Host "Installer built: $($installer.Name) ($size MB)"
+
+      # ── Code Signing (enable when you have a certificate) ──
+      # Uncomment ONE of the following signing methods:
+      #
+      # Option A: Azure Trusted Signing ($10/mo, immediate SmartScreen trust)
+      #   Requires secrets: AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
+      #                     TRUSTED_SIGNING_ACCOUNT, TRUSTED_SIGNING_PROFILE
+      #
+      # - name: Sign with Azure Trusted Signing
+      #   uses: azure/trusted-signing-action@v0.5.0
+      #   with:
+      #     azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      #     azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #     azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+      #     endpoint: https://eus.codesigning.azure.net/
+      #     trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+      #     certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+      #     files-folder: installer\windows\Output
+      #     files-folder-filter: exe
+      #     file-digest: SHA256
+      #     timestamp-rfc3161: http://timestamp.acs.microsoft.com
+      #     timestamp-digest: SHA256
+      #
+      # Option B: SignPath.io (free for open source)
+      #   Apply at https://signpath.io/open-source
+      #   Requires: SIGNPATH_API_TOKEN secret, organization/project setup
+      #
+      # - name: Sign with SignPath
+      #   uses: signpath/github-action-submit-signing-request@v1
+      #   with:
+      #     api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+      #     organization-id: <your-org-id>
+      #     project-slug: bunkervm
+      #     signing-policy-slug: release-signing
+      #     artifact-configuration-slug: windows-installer
+      #     github-artifact-id: windows-installer
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: installer/windows/Output/BunkerDesktopSetup-*.exe
+
+  # ─────────────────────────────────────────────────────────
+  #  Job 3: Create GitHub Release with all artifacts
+  # ─────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-bundle, build-desktop]
+
+    steps:
+      - name: Set version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: List release assets
+        run: find release-assets -type f -ls
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -120,25 +242,39 @@ jobs:
           body: |
             ## BunkerVM ${{ env.VERSION }}
 
-            Hardware-isolated sandbox for AI agents.
+            Hardware-isolated sandbox for AI agents, powered by Firecracker microVMs.
 
-            ### Install
+            ---
+
+            ### Windows Desktop App (recommended for most users)
+
+            Download **BunkerDesktopSetup-${{ env.VERSION }}.exe** and run it.
+            The installer sets up WSL2, installs the backend, and creates a desktop shortcut.
+            Just double-click — everything is automatic.
+
+            > **Note:** Windows may show a SmartScreen warning for unsigned builds.
+            > Click **"More info" → "Run anyway"** to proceed. The app is safe.
+
+            ### Python library (for developers / CI)
             ```
             pip install bunkervm
             ```
-            The bundle downloads automatically on first run.
+            The Firecracker bundle downloads automatically on first run.
+            For manual setup, download `bunkervm-bundle-x86_64.tar.gz` and extract to `~/.bunkervm/bundle/`.
 
-            ### Manual download
-            If auto-download fails, download `bunkervm-bundle-x86_64.tar.gz` and extract to `~/.bunkervm/bundle/`.
           files: |
-            /tmp/bunkervm-bundle-x86_64.tar.gz
+            release-assets/linux-bundle/*
+            release-assets/windows-installer/*
           draft: false
           prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') || contains(env.VERSION, 'rc') }}
 
+  # ─────────────────────────────────────────────────────────
+  #  Job 4: Publish Python package to PyPI
+  # ─────────────────────────────────────────────────────────
   publish-pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: build-bundle
+    needs: release
 
     steps:
       - uses: actions/checkout@v4

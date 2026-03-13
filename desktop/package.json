@@ -1,0 +1,12 @@
+{
+  "name": "bunkerdesktop",
+  "version": "0.7.2",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Open desktop/src/index.html in a browser or run: tauri dev'",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

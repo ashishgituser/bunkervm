@@ -23,11 +23,11 @@ logger = logging.getLogger("bunkervm.integrations")
 class BunkerVMToolsBase:
     """Shared base for all framework integrations.
 
-    Constructor modes:
-        - **No args (auto-boot):** Spins up a Firecracker microVM automatically.
-          The VM is destroyed when `stop()` is called or the context manager exits.
-        - **vsock_uds:** Connect to a pre-running VM via vsock UDS.
-        - **host / port:** Connect to a pre-running VM via TCP.
+    Constructor modes (in priority order):
+        1. **host / port:** Connect to a pre-running VM via TCP.
+        2. **vsock_uds:** Connect to a pre-running VM via vsock UDS.
+        3. **No args + engine running:** Create sandbox via engine daemon API.
+        4. **No args + no engine:** Spin up a Firecracker microVM directly.
 
     Args:
         vsock_uds: Path to BunkerVM vsock socket (e.g. /tmp/bunkervm-vsock.sock).
@@ -38,6 +38,7 @@ class BunkerVMToolsBase:
         cpus: vCPUs for auto-booted VM (ignored when connecting to existing VM).
         memory: Memory in MB for auto-booted VM.
         network: Allow internet in auto-booted VM.
+        engine_url: Explicit engine URL (e.g. http://localhost:9551). Skips discovery.
     """
 
     def __init__(
@@ -52,10 +53,14 @@ class BunkerVMToolsBase:
         cpus: int = 1,
         memory: int = 512,
         network: bool = True,
+        # Engine options
+        engine_url: Optional[str] = None,
     ):
         from bunkervm.sandbox_client import SandboxClient
 
-        self._sandbox = None  # only set in auto-boot mode
+        self._sandbox = None  # only set in direct auto-boot mode
+        self._engine = None  # only set in engine mode
+        self._engine_sandbox_id = None  # only set in engine mode
 
         if host:
             # TCP connection to pre-running VM
@@ -64,21 +69,52 @@ class BunkerVMToolsBase:
             # Vsock connection to pre-running VM
             self._client = SandboxClient(vsock_uds=vsock_uds, vsock_port=vsock_port)
         else:
-            # Auto-boot mode: spin up a disposable Sandbox VM
-            from bunkervm.runtime import Sandbox
+            # Auto mode: try engine first, then direct boot
+            engine = self._discover_engine(engine_url)
+            if engine is not None:
+                self._start_via_engine(engine, cpus, memory, network)
+            else:
+                # Direct Firecracker boot (original behavior)
+                from bunkervm.runtime import Sandbox
 
-            self._sandbox = Sandbox(
-                cpus=cpus,
-                memory=memory,
-                network=network,
-                timeout=command_timeout,
-                quiet=True,
-            )
-            self._sandbox.start()
-            self._client = self._sandbox.client
+                self._sandbox = Sandbox(
+                    cpus=cpus,
+                    memory=memory,
+                    network=network,
+                    timeout=command_timeout,
+                    quiet=True,
+                )
+                self._sandbox.start()
+                self._client = self._sandbox.client
 
         self._command_timeout = command_timeout
         logger.info("%s ready (%s)", type(self).__name__, self._client.label)
+
+    def _discover_engine(self, explicit_url: Optional[str] = None):
+        """Try to connect to the engine daemon. Returns EngineClient or None."""
+        try:
+            if explicit_url:
+                from bunkervm.engine.client import EngineClient
+                from bunkervm.engine.discovery import parse_engine_url
+                host, port = parse_engine_url(explicit_url)
+                return EngineClient(host=host, port=port)
+            else:
+                from bunkervm.engine.discovery import discover_engine
+                return discover_engine()
+        except Exception:
+            return None
+
+    def _start_via_engine(self, engine, cpus: int, memory: int, network: bool):
+        """Create a sandbox through the engine and wrap it as a client."""
+        from bunkervm.engine.client import EngineBackedClient
+
+        sb_info = engine.create_sandbox(cpus=cpus, memory=memory, network=network)
+        self._engine = engine
+        self._engine_sandbox_id = sb_info["id"]
+        self._client = EngineBackedClient(
+            engine=engine,
+            sandbox_id=self._engine_sandbox_id,
+        )
 
     # ── Properties ──
 
@@ -90,8 +126,17 @@ class BunkerVMToolsBase:
     # ── Lifecycle ──
 
     def stop(self) -> None:
-        """Destroy the auto-booted VM (no-op if using external connection)."""
-        if self._sandbox is not None:
+        """Destroy the sandbox (no-op if using external connection)."""
+        if self._engine is not None and self._engine_sandbox_id:
+            # Engine mode: destroy via engine API
+            try:
+                self._engine.destroy_sandbox(self._engine_sandbox_id)
+            except Exception:
+                pass
+            self._engine = None
+            self._engine_sandbox_id = None
+        elif self._sandbox is not None:
+            # Direct boot mode
             self._sandbox.stop()
             self._sandbox = None
 

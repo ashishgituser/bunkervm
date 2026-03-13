@@ -38,3 +38,12 @@ Thumbs.db
 *.tar.gz
 *.whl
 *.dist-info/
+build/lib/
+build/bdist*/
+
+# Desktop app build artifacts
+desktop/dist/
+desktop/build/BunkerDesktop/
+
+# Installer output
+installer/windows/Output/

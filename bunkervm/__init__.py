@@ -43,6 +43,10 @@ from bunkervm.multi_vm import VMPool  # noqa: F401
 from bunkervm.runtime import run_code, Sandbox  # noqa: F401
 from bunkervm.agent_runtime import secure_agent, SecureAgentRuntime  # noqa: F401
 
+# ── Engine API (thin client to engine daemon) ──
+from bunkervm.engine.client import EngineClient  # noqa: F401
+from bunkervm.engine.discovery import discover_engine, is_engine_running  # noqa: F401
+
 __all__ = [
     "run_code",
     "secure_agent",
@@ -50,6 +54,9 @@ __all__ = [
     "SandboxClient",
     "SecureAgentRuntime",
     "VMPool",
+    "EngineClient",
+    "discover_engine",
+    "is_engine_running",
     "__version__",
 ]
 

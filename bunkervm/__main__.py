@@ -25,11 +25,13 @@ One line. VM boots with internet access. sudo needed for TAP networking.
 import argparse
 import atexit
 import logging
+import os
 import sys
 
 
-# Route new CLI subcommands (demo, run, info, vscode-setup, enable-network) to the new CLI
-_CLI_COMMANDS = {"demo", "run", "info", "server", "vscode-setup", "enable-network"}
+# Route new CLI subcommands to the new CLI
+_CLI_COMMANDS = {"demo", "run", "info", "server", "vscode-setup", "enable-network",
+                 "engine", "sandbox"}
 
 
 def main():
@@ -129,22 +131,49 @@ def main():
     network = not args.no_network
     audit.log("server_start", transport=args.transport, network=network)
 
-    # ── Bootstrap: ensure BunkerVM bundle is ready ──
+    # ── Auto-detect running engine ──
+    # If BunkerDesktop (engine) is already running, connect to it directly.
+    # This avoids booting a separate VM — uses shared sandboxes instead.
+    engine_port = os.environ.get('BUNKERVM_ENGINE_PORT', '9551')
+    engine_url = f"http://localhost:{engine_port}"
+    use_engine = False
+
     if not args.skip_vm:
+        try:
+            from .engine.discovery import is_engine_running
+            use_engine = is_engine_running()
+            if use_engine:
+                logger.info("Engine detected at %s -- using engine mode", engine_url)
+        except Exception:
+            pass
+
+    if use_engine:
+        # Engine is running — use EngineSandboxClient (no VM boot needed)
+        from .engine_client import EngineSandboxClient
+        client = EngineSandboxClient(
+            engine_url=engine_url,
+            sandbox_name="mcp-sandbox",
+            cpus=args.cpus or 1,
+            memory=args.memory or 512,
+            network=not args.no_network,
+        )
+        logger.info("Connected to engine at %s", engine_url)
+        atexit.register(client.destroy)
+        vm = None
+    else:
+        # No engine running — boot our own VM (legacy behavior)
+
+        # ── Bootstrap: ensure BunkerVM bundle is ready ──
         from .bootstrap import ensure_ready
 
         bundle = ensure_ready()
-        # Override config paths with bootstrap-provided paths
         config.firecracker_bin = bundle.firecracker
         config.kernel_path = bundle.kernel
         config.rootfs_path = bundle.rootfs
 
-    # ── Start VM ──
-    vm = None
-    if not args.skip_vm:
+        # ── Start VM ──
         from .vm_manager import VMManager
 
-        # If --name is provided, use unique paths for this instance
         if args.name:
             safe_name = args.name.replace("/", "-").replace(" ", "-")
             config.vsock_uds_path = f"/tmp/bunkervm-vm-{safe_name}.sock"
@@ -161,23 +190,18 @@ def main():
             logger.error("Failed to start VM: %s", e)
             sys.exit(1)
 
-    # ── Connect to sandbox ──
-    from .sandbox_client import SandboxClient
+        # ── Connect to sandbox ──
+        from .sandbox_client import SandboxClient
 
-    if args.skip_vm and args.vm_ip:
-        # External VM via TCP
-        client = SandboxClient(host=args.vm_ip, port=args.vm_port or config.vm_port)
-    else:
-        # Default: vsock (works with or without TAP)
-        client = SandboxClient(vsock_uds=config.vsock_uds_path, vsock_port=config.vm_port)
+        if args.skip_vm and args.vm_ip:
+            client = SandboxClient(host=args.vm_ip, port=args.vm_port or config.vm_port)
+        else:
+            client = SandboxClient(vsock_uds=config.vsock_uds_path, vsock_port=config.vm_port)
 
-    logger.info("Connecting to sandbox via %s...", client.label)
+        logger.info("Connecting to sandbox via %s...", client.label)
 
-    if client.wait_for_health(timeout=config.health_timeout):
-        logger.info("Sandbox ready!")
-    else:
-        if args.skip_vm:
-            logger.warning("Sandbox not responding — tools will fail until VM is available")
+        if client.wait_for_health(timeout=config.health_timeout):
+            logger.info("Sandbox ready!")
         else:
             logger.error("Sandbox did not become ready in time")
             sys.exit(1)
