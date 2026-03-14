@@ -36,7 +36,7 @@ Builds a proper `BunkerDesktopSetup.exe` with wizard, license, and uninstaller:
 .\build-installer.ps1
 
 # 3. Run the generated installer:
-.\Output\BunkerDesktopSetup-0.8.5.exe
+.\Output\BunkerDesktopSetup-0.8.6.exe
 ```
 
 ## Prerequisites (handled automatically)

@@ -136,7 +136,7 @@ req = ExecRequest.from_dict({"command": "echo hi", "timeout": 10})
 check("ExecRequest.from_dict", req.command == "echo hi" and req.timeout == 10)
 
 # EngineStatus.to_dict
-status = EngineStatus(status="running", version="0.8.5", sandbox_count=3)
+status = EngineStatus(status="running", version="0.8.6", sandbox_count=3)
 d = status.to_dict()
 check("EngineStatus.to_dict", d["status"] == "running" and d["sandbox_count"] == 3)
 

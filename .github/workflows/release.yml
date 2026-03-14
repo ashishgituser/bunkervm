@@ -5,7 +5,7 @@ name: Build & Release BunkerVM
 #   2. Windows installer (BunkerDesktop.exe)          — for desktop users
 #   3. PyPI package
 #
-# Trigger: push a tag like v0.8.5
+# Trigger: push a tag like v0.8.6
 
 on:
   push:
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. v0.8.5)'
+        description: 'Release version (e.g. v0.8.6)'
         required: true
 
 permissions:
@@ -250,16 +250,13 @@ jobs:
             The installer sets up WSL2, installs the backend, and creates a desktop shortcut.
             Just double-click — everything is automatic.
 
-            > **⚠️ Windows SmartScreen:** Windows may block the installer because it's not yet code-signed. To unblock:
+            > **⚠️ Windows may block the installer** because it's not yet code-signed:
             >
-            > **Option A:** Click **"More info"** → **"Run anyway"**
+            > **SmartScreen ("Windows protected your PC"):** Click **"More info"** → **"Run anyway"**. Or right-click `.exe` → **Properties** → **"Unblock"** → OK.
             >
-            > **Option B:** Right-click the `.exe` → **Properties** → check **"Unblock"** → OK
+            > **Smart App Control (blocked with no bypass option):** Open **Windows Security** → **App & browser control** → **Smart App Control settings** → switch to **Off**. ⚠️ This is permanent and cannot be re-enabled without resetting Windows.
             >
-            > **Option C (PowerShell):**
-            > ```powershell
-            > Unblock-File -Path "$HOME\Downloads\BunkerDesktopSetup-${{ env.VERSION }}.exe"
-            > ```
+            > Code signing is coming soon.
 
             ### Python library (for developers / CI)
             ```

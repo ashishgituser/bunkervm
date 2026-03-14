@@ -26,7 +26,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 INSTALLER_DIR = PROJECT_ROOT / "installer" / "windows"
-EXPECTED_VERSION = "0.8.5"
+EXPECTED_VERSION = "0.8.6"
 
 
 # ══════════════════════════════════════════════════════════

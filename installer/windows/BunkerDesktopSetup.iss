@@ -19,7 +19,7 @@
 #define MyAppName "BunkerDesktop"
 ; Version can be overridden via: iscc /DMyAppVersion="1.0.0" ...
 #ifndef MyAppVersion
-  #define MyAppVersion "0.8.5"
+  #define MyAppVersion "0.8.6"
 #endif
 #define MyAppPublisher "BunkerVM"
 #define MyAppURL "https://github.com/ashishgituser/bunkervm"

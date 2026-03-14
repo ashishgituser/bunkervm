@@ -149,7 +149,7 @@ if (-not (Test-Path $outputDir)) {
 
 # ── Read version from pyproject.toml ──
 $pyproject = Join-Path $rootDir "pyproject.toml"
-$version = "0.8.5"
+$version = "0.8.6"
 if (Test-Path $pyproject) {
     $match = Select-String -Path $pyproject -Pattern 'version\s*=\s*"([^"]+)"' | Select-Object -First 1
     if ($match) {

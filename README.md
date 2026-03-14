@@ -46,18 +46,20 @@
 
 That's it. No `pip install`, no WSL commands, no config files.
 
-> **Windows SmartScreen warning:** Windows may block the installer because it's not yet code-signed. To unblock:
+> **Windows may block the installer** because it's not yet code-signed. Here's how to fix it:
 >
-> **Option A (easiest):** When you see "Windows protected your PC", click **"More info"** → **"Run anyway"**.
+> **If you see "Windows protected your PC" (SmartScreen):**
+> Click **"More info"** → **"Run anyway"**. Or right-click the `.exe` → **Properties** → check **"Unblock"** → OK.
 >
-> **Option B (right-click):** Right-click the downloaded `.exe` → **Properties** → check **"Unblock"** at the bottom → **OK** → then run it.
+> **If the app is blocked entirely with no "Run anyway" option (Smart App Control):**
+> Windows 11's Smart App Control blocks all unsigned apps with no bypass. To fix:
+> 1. Open **Windows Security** → **App & browser control** → **Smart App Control settings**
+> 2. Switch from **On** to **Off**
+> 3. Run the installer
 >
-> **Option C (PowerShell):**
-> ```powershell
-> Unblock-File -Path "$HOME\Downloads\BunkerDesktopSetup-*.exe"
-> ```
+> ⚠️ *Turning off Smart App Control is permanent — it cannot be re-enabled without resetting Windows. This is a [known Microsoft limitation](https://support.microsoft.com/en-us/topic/smart-app-control-285ea03d-fa88-4b54-bfb0-a40191834e56).*
 >
-> This is standard for open-source desktop apps. Code signing is coming soon.
+> Code signing is coming soon — once signed, both SmartScreen and Smart App Control will allow the installer automatically.
 
 > **VS Code + Copilot users:** BunkerDesktop runs the engine in the background. Once it's running, Copilot Chat automatically connects to it — every tool call runs in a hardware-isolated VM.
 
