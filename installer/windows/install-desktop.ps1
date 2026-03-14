@@ -47,7 +47,7 @@ $ErrorActionPreference = "Stop"
 # ══════════════════════════════════════
 
 $AppName        = "BunkerDesktop"
-$AppVersion     = "0.8.2"
+$AppVersion     = "0.8.3"
 $AppPublisher   = "BunkerVM"
 $AppExe         = "BunkerDesktop.cmd"
 

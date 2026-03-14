@@ -19,6 +19,9 @@ ENGINE_URL = f"http://localhost:{ENGINE_PORT}"
 STATUS_URL = f"{ENGINE_URL}/engine/status"
 POLL_START_TIMEOUT = 30  # seconds to wait for engine to start
 
+# Hide CMD windows when spawning WSL subprocesses on Windows
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 # Resolve asset directory (HTML/CSS/JS)
 # When frozen by PyInstaller, assets are in sys._MEIPASS/src/
 # When running from source, assets are in ./src/
@@ -54,7 +57,8 @@ def find_wsl_distro():
         try:
             r = subprocess.run(
                 ["wsl", "-d", name, "--", "echo", "ok"],
-                capture_output=True, timeout=5
+                capture_output=True, timeout=5,
+                creationflags=_NO_WINDOW,
             )
             if r.returncode == 0:
                 return name
@@ -74,7 +78,8 @@ def find_bunkervm_path(distro):
         try:
             r = subprocess.run(
                 ["wsl", "-d", distro, "--", "bash", "-c", f"test -x {p}"],
-                capture_output=True, timeout=5
+                capture_output=True, timeout=5,
+                creationflags=_NO_WINDOW,
             )
             if r.returncode == 0:
                 return p
@@ -91,7 +96,7 @@ def start_engine_wsl(distro, bvm_path):
             ["wsl", "-d", distro, "--", bvm_path, "engine", "start"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            creationflags=_NO_WINDOW,
         )
         return True
     except Exception as e:
@@ -105,7 +110,6 @@ def fix_kvm_permissions(distro):
     Uses 'wsl -u root' which runs as root WITHOUT needing a password.
     Also sets up /etc/wsl.conf so it persists across WSL reboots.
     """
-    CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
     # 1. Immediate fix: chmod 666 /dev/kvm (as root, no password)
     try:
@@ -113,7 +117,7 @@ def fix_kvm_permissions(distro):
             ["wsl", "-u", "root", "-d", distro, "--",
              "chmod", "666", "/dev/kvm"],
             capture_output=True, timeout=10,
-            creationflags=CREATE_NO_WINDOW,
+            creationflags=_NO_WINDOW,
         )
     except Exception:
         pass
@@ -126,11 +130,9 @@ def fix_kvm_permissions(distro):
             ["wsl", "-u", "root", "-d", distro, "--",
              "grep", "-q", "chmod.*kvm", "/etc/wsl.conf"],
             capture_output=True, timeout=5,
-            creationflags=CREATE_NO_WINDOW,
+            creationflags=_NO_WINDOW,
         )
         if r.returncode != 0:
-            # Not configured yet - add boot command
-            # Use a script that appends to wsl.conf safely
             wsl_conf_cmd = (
                 "if grep -q '\\[boot\\]' /etc/wsl.conf 2>/dev/null; then "
                 "  grep -q 'chmod.*kvm' /etc/wsl.conf || "
@@ -143,7 +145,7 @@ def fix_kvm_permissions(distro):
                 ["wsl", "-u", "root", "-d", distro, "--",
                  "bash", "-c", wsl_conf_cmd],
                 capture_output=True, timeout=10,
-                creationflags=CREATE_NO_WINDOW,
+                creationflags=_NO_WINDOW,
             )
     except Exception:
         pass  # Non-critical - immediate fix is enough
