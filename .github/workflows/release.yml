@@ -5,7 +5,7 @@ name: Build & Release BunkerVM
 #   2. Windows installer (BunkerDesktop.exe)          — for desktop users
 #   3. PyPI package
 #
-# Trigger: push a tag like v0.8.0
+# Trigger: push a tag like v0.8.1
 
 on:
   push:
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. v0.8.0)'
+        description: 'Release version (e.g. v0.8.1)'
         required: true
 
 permissions:
