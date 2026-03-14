@@ -79,8 +79,8 @@ Source: "..\..\rootfs\*"; DestDir: "{app}\src\rootfs"; Flags: ignoreversion recu
 ; Start Menu
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Comment: "Launch BunkerDesktop"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-; Desktop
-Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"; Comment: "Launch BunkerDesktop"; Tasks: desktopicon
+; Desktop (use {userdesktop} not {commondesktop} — we run without admin)
+Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"; Comment: "Launch BunkerDesktop"; Tasks: desktopicon
 
 [Registry]
 ; Add install dir to user PATH
