@@ -1,0 +1,11 @@
+# BunkerVM + LangGraph Multi-Agent Demo
+# Install: pip install -r requirements.txt
+
+bunkervm
+langgraph
+langchain-core
+langchain-openai
+python-dotenv
+
+# Optional: use Anthropic instead of OpenAI
+# langchain-anthropic
