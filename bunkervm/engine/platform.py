@@ -20,7 +20,6 @@ import sys
 from dataclasses import dataclass
 from typing import Optional
 
-
 # ── Primitives ──
 
 
@@ -72,7 +71,9 @@ def wsl2_available() -> bool:
     try:
         result = subprocess.run(
             ["wsl", "--list", "--verbose"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         # Output contains VERSION 2 lines for WSL2 distros.
         # The output is sometimes UTF‑16‑LE on Windows, so decode defensively.
@@ -89,7 +90,8 @@ def list_wsl_distros() -> list[str]:
     try:
         result = subprocess.run(
             ["wsl", "--list", "--quiet"],
-            capture_output=True, timeout=10,
+            capture_output=True,
+            timeout=10,
         )
         if result.returncode != 0:
             return []
@@ -123,8 +125,8 @@ def default_wsl_distro() -> Optional[str]:
 class PlatformInfo:
     """Snapshot of the runtime environment."""
 
-    os: str                     # "windows" | "linux" | "wsl" | "unknown"
-    arch: str                   # e.g. "x86_64", "aarch64"
+    os: str  # "windows" | "linux" | "wsl" | "unknown"
+    arch: str  # e.g. "x86_64", "aarch64"
     python_version: str
     kvm_available: bool
     wsl2_available: bool

@@ -20,7 +20,6 @@ Requires:
 
 from __future__ import annotations
 
-import atexit
 import json
 import logging
 import os
@@ -35,6 +34,7 @@ logger = logging.getLogger("bunkervm.vm")
 
 class VMError(Exception):
     """VM lifecycle error."""
+
     pass
 
 
@@ -108,8 +108,10 @@ class VMManager:
             self._process = subprocess.Popen(
                 [
                     fc_bin,
-                    "--api-sock", self._socket_path,
-                    "--config-file", self._config_path,
+                    "--api-sock",
+                    self._socket_path,
+                    "--config-file",
+                    self._config_path,
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -138,8 +140,9 @@ class VMManager:
                 pass
             raise VMError(f"Firecracker exited immediately.\nStderr: {stderr}")
 
-        logger.info("VM started (PID %d), vsock UDS: %s",
-                     self._process.pid, self.config.vsock_uds_path)
+        logger.info(
+            "VM started (PID %d), vsock UDS: %s", self._process.pid, self.config.vsock_uds_path
+        )
 
     def stop(self) -> None:
         """Stop the Firecracker VM and clean up everything."""
@@ -230,11 +233,22 @@ class VMManager:
             # NAT for internet access
             default_iface = self._get_default_iface()
             if default_iface:
-                self._run_sudo([
-                    "iptables", "-t", "nat", "-A", "POSTROUTING",
-                    "-o", default_iface, "-s", f"{host_ip}/{subnet}",
-                    "-j", "MASQUERADE",
-                ], check=False)
+                self._run_sudo(
+                    [
+                        "iptables",
+                        "-t",
+                        "nat",
+                        "-A",
+                        "POSTROUTING",
+                        "-o",
+                        default_iface,
+                        "-s",
+                        f"{host_ip}/{subnet}",
+                        "-j",
+                        "MASQUERADE",
+                    ],
+                    check=False,
+                )
 
             logger.info("TAP device %s ready", tap)
         except subprocess.CalledProcessError as e:
@@ -256,7 +270,9 @@ class VMManager:
         try:
             result = subprocess.run(
                 ["ip", "route", "show", "default"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             for word in result.stdout.split():
                 if word.startswith("eth") or word.startswith("wl") or word.startswith("en"):
@@ -293,8 +309,7 @@ class VMManager:
             # Attempt auto-fix (passwordless sudo)
             try:
                 subprocess.run(
-                    ["sudo", "-n", "chmod", "666", "/dev/kvm"],
-                    capture_output=True, timeout=5
+                    ["sudo", "-n", "chmod", "666", "/dev/kvm"], capture_output=True, timeout=5
                 )
             except Exception:
                 pass
@@ -343,16 +358,17 @@ class VMManager:
             "boot-source": {
                 "kernel_image_path": self.config.kernel_path,
                 "boot_args": (
-                    "console=ttyS0 reboot=k panic=1 pci=off "
-                    "init=/init quiet loglevel=1"
+                    "console=ttyS0 reboot=k panic=1 pci=off " "init=/init quiet loglevel=1"
                 ),
             },
-            "drives": [{
-                "drive_id": "rootfs",
-                "path_on_host": rootfs,
-                "is_root_device": True,
-                "is_read_only": False,
-            }],
+            "drives": [
+                {
+                    "drive_id": "rootfs",
+                    "path_on_host": rootfs,
+                    "is_root_device": True,
+                    "is_read_only": False,
+                }
+            ],
             "machine-config": {
                 "vcpu_count": self.config.vcpu_count,
                 "mem_size_mib": self.config.mem_size_mib,
@@ -366,11 +382,13 @@ class VMManager:
 
         # Add TAP networking (default on, disable with --no-network)
         if self._network and self.config.tap_device:
-            config["network-interfaces"] = [{
-                "iface_id": "eth0",
-                "guest_mac": self.config.guest_mac,
-                "host_dev_name": self.config.tap_device,
-            }]
+            config["network-interfaces"] = [
+                {
+                    "iface_id": "eth0",
+                    "guest_mac": self.config.guest_mac,
+                    "host_dev_name": self.config.tap_device,
+                }
+            ]
 
         fd, path = tempfile.mkstemp(prefix="bunkervm-vm-", suffix=".json")
         with os.fdopen(fd, "w") as f:
@@ -384,9 +402,17 @@ class VMManager:
         full_cmd = ["sudo", "-n"] + cmd
         try:
             return subprocess.run(
-                full_cmd, capture_output=True, text=True, timeout=10, check=check,
+                full_cmd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=check,
             )
         except FileNotFoundError:
             return subprocess.run(
-                cmd, capture_output=True, text=True, timeout=10, check=check,
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=check,
             )

@@ -28,16 +28,24 @@ import logging
 import os
 import sys
 
-
 # Route new CLI subcommands to the new CLI
-_CLI_COMMANDS = {"demo", "run", "info", "server", "vscode-setup", "enable-network",
-                 "engine", "sandbox"}
+_CLI_COMMANDS = {
+    "demo",
+    "run",
+    "info",
+    "server",
+    "vscode-setup",
+    "enable-network",
+    "engine",
+    "sandbox",
+}
 
 
 def main():
     # If first arg is a new CLI subcommand, delegate to bunkervm.cli
     if len(sys.argv) > 1 and sys.argv[1] in _CLI_COMMANDS:
         from .cli import main as cli_main
+
         raise SystemExit(cli_main())
 
     parser = argparse.ArgumentParser(
@@ -45,59 +53,81 @@ def main():
         description="BunkerVM — Hardware-isolated sandbox for AI agents",
     )
     parser.add_argument(
-        "--transport", choices=["stdio", "sse"], default="stdio",
+        "--transport",
+        choices=["stdio", "sse"],
+        default="stdio",
         help="MCP transport: stdio (default, for Claude) or sse (remote)",
     )
     parser.add_argument(
-        "--port", type=int, default=3000,
+        "--port",
+        type=int,
+        default=3000,
         help="Port for SSE transport (default: 3000)",
     )
     parser.add_argument(
-        "--config", default=None,
+        "--config",
+        default=None,
         help="Path to bunkervm.toml config file",
     )
     parser.add_argument(
-        "--no-network", action="store_true",
+        "--no-network",
+        action="store_true",
         help="Disable TAP networking (no internet in VM, no sudo needed)",
     )
     parser.add_argument(
-        "--skip-vm", action="store_true",
+        "--skip-vm",
+        action="store_true",
         help="Don't start VM (assume externally managed)",
     )
     parser.add_argument(
-        "--vm-ip", default=None,
+        "--vm-ip",
+        default=None,
         help="Override VM IP (only with --network or --skip-vm)",
     )
     parser.add_argument(
-        "--vm-port", type=int, default=None,
+        "--vm-port",
+        type=int,
+        default=None,
         help="Override VM exec-agent port",
     )
     parser.add_argument(
-        "--cpus", type=int, default=None,
+        "--cpus",
+        type=int,
+        default=None,
         help="Number of vCPUs for the VM (default: 2)",
     )
     parser.add_argument(
-        "--memory", type=int, default=None,
+        "--memory",
+        type=int,
+        default=None,
         help="VM memory in MB (default: 2048)",
     )
     parser.add_argument(
-        "--max-exec-timeout", type=int, default=None,
+        "--max-exec-timeout",
+        type=int,
+        default=None,
         help="Maximum allowed command timeout in seconds (default: 300)",
     )
     parser.add_argument(
-        "--name", default=None,
+        "--name",
+        default=None,
         help="VM instance name (for multi-VM support)",
     )
     parser.add_argument(
-        "--dashboard", action="store_true",
+        "--dashboard",
+        action="store_true",
         help="Enable web dashboard at http://localhost:<port+1>/dashboard",
     )
     parser.add_argument(
-        "--dashboard-port", type=int, default=None,
+        "--dashboard-port",
+        type=int,
+        default=None,
         help="Dashboard port (default: MCP port + 1, i.e. 3001)",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true",
+        "-v",
+        "--verbose",
+        action="store_true",
         help="Enable debug logging",
     )
     args = parser.parse_args()
@@ -112,6 +142,7 @@ def main():
 
     # ── Load config ──
     from .config import load_config
+
     config = load_config(args.config)
 
     if args.vm_ip:
@@ -127,6 +158,7 @@ def main():
 
     # ── Audit logger ──
     from .audit import AuditLogger
+
     audit = AuditLogger(config.audit_log_path)
     network = not args.no_network
     audit.log("server_start", transport=args.transport, network=network)
@@ -134,13 +166,14 @@ def main():
     # ── Auto-detect running engine ──
     # If BunkerDesktop (engine) is already running, connect to it directly.
     # This avoids booting a separate VM — uses shared sandboxes instead.
-    engine_port = os.environ.get('BUNKERVM_ENGINE_PORT', '9551')
+    engine_port = os.environ.get("BUNKERVM_ENGINE_PORT", "9551")
     engine_url = f"http://localhost:{engine_port}"
     use_engine = False
 
     if not args.skip_vm:
         try:
             from .engine.discovery import is_engine_running
+
             use_engine = is_engine_running()
             if use_engine:
                 logger.info("Engine detected at %s -- using engine mode", engine_url)
@@ -150,6 +183,7 @@ def main():
     if use_engine:
         # Engine is running — use EngineSandboxClient (no VM boot needed)
         from .engine_client import EngineSandboxClient
+
         client = EngineSandboxClient(
             engine_url=engine_url,
             sandbox_name="mcp-sandbox",
@@ -218,6 +252,7 @@ def main():
     # ── Start dashboard (if enabled or SSE transport) ──
     if args.dashboard or args.transport == "sse":
         from .dashboard import DashboardServer
+
         dash_port = args.dashboard_port or (args.port + 1)
         dashboard = DashboardServer(client, audit, vm, port=dash_port, config=config)
         dashboard.start()

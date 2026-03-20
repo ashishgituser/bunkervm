@@ -24,7 +24,6 @@ from __future__ import annotations
 import json
 import logging
 import threading
-import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from typing import Optional
@@ -34,6 +33,7 @@ logger = logging.getLogger("bunkervm.dashboard")
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     """HTTP server that handles each request in a new thread."""
+
     daemon_threads = True
 
 
@@ -495,9 +495,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             try:
                 status = self._client.status()
                 if status.get("memory"):
-                    vm_entry["mem_used_mb"] = round(
-                        status["memory"].get("used_bytes", 0) / 1048576
-                    )
+                    vm_entry["mem_used_mb"] = round(status["memory"].get("used_bytes", 0) / 1048576)
                     vm_entry["mem_total_mb"] = round(
                         status["memory"].get("total_bytes", 0) / 1048576
                     )
@@ -529,6 +527,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif path == "/api/exec":
             # Parse query params
             from urllib.parse import urlparse, parse_qs
+
             query = parse_qs(urlparse(self.path).query)
             cmd = query.get("cmd", [""])[0]
             if not cmd:
@@ -542,6 +541,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif path == "/api/audit":
             from urllib.parse import urlparse, parse_qs
+
             query = parse_qs(urlparse(self.path).query)
             n = int(query.get("n", ["50"])[0])
             try:

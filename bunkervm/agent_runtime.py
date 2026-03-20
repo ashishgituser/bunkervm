@@ -23,9 +23,8 @@ How it works:
 
 from __future__ import annotations
 
-import functools
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger("bunkervm.agent_runtime")
 

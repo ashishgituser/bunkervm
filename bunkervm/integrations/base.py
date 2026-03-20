@@ -96,10 +96,12 @@ class BunkerVMToolsBase:
             if explicit_url:
                 from bunkervm.engine.client import EngineClient
                 from bunkervm.engine.discovery import parse_engine_url
+
                 host, port = parse_engine_url(explicit_url)
                 return EngineClient(host=host, port=port)
             else:
                 from bunkervm.engine.discovery import discover_engine
+
                 return discover_engine()
         except Exception:
             return None

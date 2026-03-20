@@ -73,6 +73,7 @@ class _RingBufferHandler(logging.Handler):
 
 class _ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """HTTP server that handles each request in a new thread."""
+
     daemon_threads = True
     allow_reuse_address = True
 
@@ -101,8 +102,9 @@ class EngineDaemon:
         self.log_handler = _RingBufferHandler(capacity=500)
         self.log_handler.setLevel(logging.DEBUG)
         self.log_handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-                              datefmt="%H:%M:%S")
+            logging.Formatter(
+                "%(asctime)s [%(name)s] %(levelname)s: %(message)s", datefmt="%H:%M:%S"
+            )
         )
         # Attach to root logger to capture all bunkervm.* logs
         root_logger = logging.getLogger("bunkervm")
@@ -126,6 +128,7 @@ class EngineDaemon:
             RuntimeError: If called on Windows (use :class:`WSLBridge` instead).
         """
         from .platform import is_windows
+
         if is_windows():
             raise RuntimeError(
                 "The engine daemon cannot run on Windows directly.  "
@@ -166,7 +169,9 @@ class EngineDaemon:
         _print(f"  Max sandboxes: {self.config.max_sandboxes}")
         logger.info(
             "Engine started on %s:%d (PID %d)",
-            self.config.host, self.config.port, os.getpid(),
+            self.config.host,
+            self.config.port,
+            os.getpid(),
         )
 
         try:
@@ -192,10 +197,7 @@ class EngineDaemon:
 
         logger.info("/dev/kvm not accessible, attempting to fix permissions...")
         try:
-            subprocess.run(
-                ["sudo", "-n", "chmod", "666", kvm_path],
-                capture_output=True, timeout=5
-            )
+            subprocess.run(["sudo", "-n", "chmod", "666", kvm_path], capture_output=True, timeout=5)
             if os.access(kvm_path, os.R_OK | os.W_OK):
                 logger.info("/dev/kvm permissions fixed successfully")
                 _print("  /dev/kvm permissions fixed automatically")
@@ -309,11 +311,14 @@ class EngineDaemon:
 
         logger.info(
             "Creating sandbox %s (%s): cpus=%d, memory=%dMB",
-            sandbox_id, name, use_cpus, use_memory,
+            sandbox_id,
+            name,
+            use_cpus,
+            use_memory,
         )
 
         # Start the VM via VMPool
-        client = self._pool.start(
+        self._pool.start(
             name=pool_name,
             cpus=use_cpus,
             memory=use_memory,

@@ -51,6 +51,7 @@ def discover_engine() -> Optional["EngineClient"]:
     # Try to actually reach the engine
     if _probe_engine(host, port):
         from .client import EngineClient
+
         logger.info("Engine discovered at %s:%d", host, port)
         return EngineClient(host=host, port=port)
 
@@ -91,6 +92,7 @@ def _resolve_engine_address() -> Tuple[Optional[str], int]:
     # 2. PID file check — if PID is alive, engine is probably there
     #    (only meaningful on Linux / WSL where the PID lives)
     from .platform import is_windows
+
     if not is_windows():
         config = EngineConfig()
         pid = config.read_pid()

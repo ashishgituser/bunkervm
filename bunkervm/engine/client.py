@@ -95,11 +95,14 @@ class EngineClient:
         workdir: str = "/root",
     ) -> Dict[str, Any]:
         """POST /sandboxes/{id}/exec — execute a command."""
-        return self._post(f"/sandboxes/{sandbox_id}/exec", {
-            "command": command,
-            "timeout": timeout,
-            "workdir": workdir,
-        })
+        return self._post(
+            f"/sandboxes/{sandbox_id}/exec",
+            {
+                "command": command,
+                "timeout": timeout,
+                "workdir": workdir,
+            },
+        )
 
     def write_file(
         self,
@@ -108,10 +111,13 @@ class EngineClient:
         content: str,
     ) -> Dict[str, Any]:
         """POST /sandboxes/{id}/write-file — write a file in the sandbox."""
-        return self._post(f"/sandboxes/{sandbox_id}/write-file", {
-            "path": path,
-            "content": content,
-        })
+        return self._post(
+            f"/sandboxes/{sandbox_id}/write-file",
+            {
+                "path": path,
+                "content": content,
+            },
+        )
 
     def read_file(self, sandbox_id: str, path: str) -> Dict[str, Any]:
         """GET /sandboxes/{id}/read-file?path=... — read a file."""
@@ -224,6 +230,7 @@ class EngineAPIError(Exception):
 
 class EngineConnectionError(Exception):
     """Raised when the engine daemon is not reachable."""
+
     pass
 
 

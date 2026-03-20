@@ -72,6 +72,7 @@ def get_toolkit(**kwargs):
         tools = toolkit.get_tools()
     """
     from bunkervm.langchain import BunkerVMToolkit
+
     return BunkerVMToolkit(**kwargs)
 
 
@@ -86,6 +87,7 @@ def get_openai_tools(**kwargs):
         tools = tools_provider.get_tools()
     """
     from bunkervm.openai_agents import BunkerVMTools
+
     return BunkerVMTools(**kwargs)
 
 
@@ -100,4 +102,5 @@ def get_crewai_tools(**kwargs):
         tools = crew_tools.get_tools()
     """
     from bunkervm.crewai import BunkerVMCrewTools
+
     return BunkerVMCrewTools(**kwargs)

@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Optional
 
 logger = logging.getLogger("bunkervm.config")
@@ -27,37 +25,30 @@ _DEFAULTS = {
     # VM resources
     "vcpu_count": 2,
     "mem_size_mib": 2048,
-
     # VSOCK (default transport — zero config)
     "vsock_cid": 3,
     "vsock_uds_path": "/tmp/bunkervm-vsock.sock",
-    "vm_port": 8080,    # Port inside VM (both vsock and TCP)
-
+    "vm_port": 8080,  # Port inside VM (both vsock and TCP)
     # Paths (auto-provisioned into ~/.bunkervm/bundle/ on first run)
     "firecracker_bin": "~/.bunkervm/bundle/firecracker",
     "kernel_path": "~/.bunkervm/bundle/vmlinux",
     "rootfs_path": "~/.bunkervm/bundle/rootfs.ext4",
     "rootfs_work_path": "/tmp/bunkervm-sandbox-rootfs.ext4",
     "socket_path": "/tmp/bunkervm-fc.sock",
-
     # TAP networking (optional — only with --network flag)
     "vm_ip": "172.16.0.2",
     "host_ip": "172.16.0.1",
     "subnet_mask": "24",
     "tap_device": "tap0",
     "guest_mac": "AA:FC:00:00:00:01",
-
     # Audit & logging
     "audit_log_path": "~/.bunkervm/logs/audit.jsonl",
-
     # Timeouts
     "health_timeout": 60,
     "default_exec_timeout": 30,
     "max_exec_timeout": 300,
-
     # Safety
     "enforce_safety": True,
-
     # Server
     "transport": "stdio",
     "sse_port": 3000,
@@ -182,6 +173,7 @@ def _read_toml(path: str) -> dict:
     try:
         # Python 3.11+
         import tomllib
+
         with open(path, "rb") as f:
             return tomllib.load(f)
     except ImportError:
@@ -190,6 +182,7 @@ def _read_toml(path: str) -> dict:
     try:
         # Third-party fallback
         import tomli
+
         with open(path, "rb") as f:
             return tomli.load(f)
     except ImportError:
@@ -236,7 +229,7 @@ def _basic_toml_parse(path: str) -> dict:
 
                 # Strip inline comments
                 if " #" in value:
-                    value = value[:value.index(" #")].strip()
+                    value = value[: value.index(" #")].strip()
 
                 # Parse value
                 parsed = _parse_value(value)
@@ -252,8 +245,9 @@ def _basic_toml_parse(path: str) -> dict:
 def _parse_value(value: str):
     """Parse a TOML value (string, int, float, bool)."""
     # Quoted string
-    if (value.startswith('"') and value.endswith('"')) or \
-       (value.startswith("'") and value.endswith("'")):
+    if (value.startswith('"') and value.endswith('"')) or (
+        value.startswith("'") and value.endswith("'")
+    ):
         return value[1:-1]
 
     # Boolean
@@ -335,7 +329,9 @@ def _validate(config: BunkerVMConfig) -> None:
         logger.warning("vcpu_count=%d is unusual (expected 1-32)", config.vcpu_count)
 
     if config.mem_size_mib < 256:
-        logger.warning("mem_size_mib=%d is very low (minimum recommended: 512)", config.mem_size_mib)
+        logger.warning(
+            "mem_size_mib=%d is very low (minimum recommended: 512)", config.mem_size_mib
+        )
 
     if config.vm_port < 1 or config.vm_port > 65535:
         raise ValueError(f"Invalid vm_port: {config.vm_port}")

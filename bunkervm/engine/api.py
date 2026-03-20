@@ -30,18 +30,15 @@ import platform
 import re
 import time
 from http.server import BaseHTTPRequestHandler
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
 from .models import (
     ApiError,
     EngineStatus,
     ExecRequest,
-    ExecResult,
     SandboxCreateRequest,
-    SandboxInfo,
     WriteFileRequest,
-    _new_id,
 )
 
 if TYPE_CHECKING:
@@ -148,6 +145,7 @@ class EngineAPIHandler(BaseHTTPRequestHandler):
 
     def _handle_engine_status(self, _query: dict):
         from bunkervm import __version__
+
         status = EngineStatus(
             status="running",
             version=__version__,
@@ -176,6 +174,7 @@ class EngineAPIHandler(BaseHTTPRequestHandler):
         self._send_json(200, {"status": "stopping", "message": "Engine shutting down..."})
         # Schedule shutdown after response is sent
         import threading
+
         threading.Thread(target=self.daemon.stop, daemon=True).start()
 
     # ── Sandbox CRUD Routes ──
@@ -239,7 +238,7 @@ class EngineAPIHandler(BaseHTTPRequestHandler):
                 timeout=req.timeout,
                 workdir=req.workdir,
             )
-            exit_code = result.get('exit_code', '?')
+            exit_code = result.get("exit_code", "?")
             logger.info("[%s] exec done (exit=%s)", sb_name, exit_code)
             self._send_json(200, result)
         except Exception as e:
@@ -347,9 +346,9 @@ class EngineAPIHandler(BaseHTTPRequestHandler):
         dashboard_dir = self._find_dashboard_dir()
         if dashboard_dir is None:
             self._send_error(
-                404, "Dashboard not found",
-                "Desktop UI not installed. Set BUNKERVM_DASHBOARD_DIR or "
-                "reinstall the package.",
+                404,
+                "Dashboard not found",
+                "Desktop UI not installed. Set BUNKERVM_DASHBOARD_DIR or " "reinstall the package.",
             )
             return
 

@@ -62,8 +62,7 @@ class EngineSandboxClient:
     def sandbox_id(self) -> str | None:
         return self._sandbox_id
 
-    def _api(self, method: str, path: str, body: dict | None = None,
-             timeout: int = 30) -> dict:
+    def _api(self, method: str, path: str, body: dict | None = None, timeout: int = 30) -> dict:
         """Make an HTTP request to the engine API."""
         url = f"{self._engine_url}{path}"
         data = None
@@ -71,7 +70,9 @@ class EngineSandboxClient:
             data = json.dumps(body).encode("utf-8")
 
         req = urllib.request.Request(
-            url, method=method, data=data,
+            url,
+            method=method,
+            data=data,
             headers={"Content-Type": "application/json"} if data else {},
         )
         try:
@@ -81,9 +82,7 @@ class EngineSandboxClient:
             body_text = e.read().decode("utf-8", errors="replace")
             try:
                 err = json.loads(body_text)
-                raise ConnectionError(
-                    err.get("detail", err.get("error", f"HTTP {e.code}"))
-                )
+                raise ConnectionError(err.get("detail", err.get("error", f"HTTP {e.code}")))
             except (json.JSONDecodeError, ConnectionError):
                 if isinstance(body_text, str) and "detail" not in body_text:
                     raise ConnectionError(f"HTTP {e.code}: {body_text[:200]}")
@@ -99,8 +98,7 @@ class EngineSandboxClient:
                 self._api("GET", f"/sandboxes/{self._sandbox_id}", timeout=5)
                 return self._sandbox_id
             except ConnectionError:
-                logger.info("Sandbox %s gone, will create new one",
-                            self._sandbox_id)
+                logger.info("Sandbox %s gone, will create new one", self._sandbox_id)
                 self._sandbox_id = None
 
         # Check if our named sandbox already exists
@@ -109,63 +107,80 @@ class EngineSandboxClient:
             for sb in data.get("sandboxes", []):
                 if sb.get("name") == self._sandbox_name:
                     self._sandbox_id = sb["id"]
-                    logger.info("Reusing existing sandbox: %s (%s)",
-                                self._sandbox_name, self._sandbox_id)
+                    logger.info(
+                        "Reusing existing sandbox: %s (%s)", self._sandbox_name, self._sandbox_id
+                    )
                     return self._sandbox_id
         except ConnectionError:
             pass
 
         # Create new sandbox
         logger.info("Creating sandbox '%s' via engine...", self._sandbox_name)
-        result = self._api("POST", "/sandboxes", {
-            "name": self._sandbox_name,
-            "cpus": self._cpus,
-            "memory": self._memory,
-            "network": self._network,
-        }, timeout=60)
+        result = self._api(
+            "POST",
+            "/sandboxes",
+            {
+                "name": self._sandbox_name,
+                "cpus": self._cpus,
+                "memory": self._memory,
+                "network": self._network,
+            },
+            timeout=60,
+        )
 
         self._sandbox_id = result["id"]
-        logger.info("Sandbox created: %s (%s)", self._sandbox_name,
-                     self._sandbox_id)
+        logger.info("Sandbox created: %s (%s)", self._sandbox_name, self._sandbox_id)
         return self._sandbox_id
 
     # ── SandboxClient interface ──
 
-    def exec(self, command: str, timeout: int = 30,
-             workdir: str = "/root") -> dict:
+    def exec(self, command: str, timeout: int = 30, workdir: str = "/root") -> dict:
         """Execute a shell command inside the sandbox."""
         sid = self._ensure_sandbox()
-        return self._api("POST", f"/sandboxes/{sid}/exec", {
-            "command": command,
-            "timeout": timeout,
-            "workdir": workdir,
-        }, timeout=timeout + 15)
+        return self._api(
+            "POST",
+            f"/sandboxes/{sid}/exec",
+            {
+                "command": command,
+                "timeout": timeout,
+                "workdir": workdir,
+            },
+            timeout=timeout + 15,
+        )
 
     def read_file(self, path: str) -> dict:
         """Read a file from the sandbox."""
         sid = self._ensure_sandbox()
         from urllib.parse import quote
+
         return self._api(
             "GET",
             f"/sandboxes/{sid}/read-file?path={quote(path, safe='')}",
             timeout=15,
         )
 
-    def write_file(self, path: str, content: str, mode: str = "overwrite",
-                   encoding: str = "utf-8") -> dict:
+    def write_file(
+        self, path: str, content: str, mode: str = "overwrite", encoding: str = "utf-8"
+    ) -> dict:
         """Write a file to the sandbox."""
         sid = self._ensure_sandbox()
-        return self._api("POST", f"/sandboxes/{sid}/write-file", {
-            "path": path,
-            "content": content,
-            "mode": mode,
-            "encoding": encoding,
-        }, timeout=15)
+        return self._api(
+            "POST",
+            f"/sandboxes/{sid}/write-file",
+            {
+                "path": path,
+                "content": content,
+                "mode": mode,
+                "encoding": encoding,
+            },
+            timeout=15,
+        )
 
     def list_dir(self, path: str = "/") -> dict:
         """List directory contents."""
         sid = self._ensure_sandbox()
         from urllib.parse import quote
+
         return self._api(
             "GET",
             f"/sandboxes/{sid}/list-dir?path={quote(path, safe='')}",
@@ -175,6 +190,7 @@ class EngineSandboxClient:
     def upload_file(self, local_path: str, remote_path: str) -> dict:
         """Upload a file from host to sandbox."""
         import base64
+
         with open(local_path, "rb") as f:
             data = f.read()
         encoded = base64.b64encode(data).decode("ascii")
@@ -183,6 +199,7 @@ class EngineSandboxClient:
     def download_file(self, remote_path: str) -> bytes:
         """Download a file from sandbox."""
         import base64
+
         result = self.read_file(remote_path)
         content = result.get("content", "")
         encoding = result.get("encoding", "utf-8")
@@ -226,9 +243,7 @@ class EngineSandboxClient:
         """Reset the sandbox (destroy + recreate)."""
         if self._sandbox_id:
             try:
-                result = self._api(
-                    "POST", f"/sandboxes/{self._sandbox_id}/reset", timeout=60
-                )
+                result = self._api("POST", f"/sandboxes/{self._sandbox_id}/reset", timeout=60)
                 return result
             except ConnectionError:
                 pass

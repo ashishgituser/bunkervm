@@ -24,10 +24,10 @@ from .safety import classify_command, SafetyLevel
 logger = logging.getLogger("bunkervm.mcp")
 
 # ── Global state (set by __main__.py before server starts) ──
-_client = None       # SandboxClient
-_audit = None        # AuditLogger
-_vm_manager = None   # VMManager (optional)
-_config = None       # BunkerVMConfig
+_client = None  # SandboxClient
+_audit = None  # AuditLogger
+_vm_manager = None  # VMManager (optional)
+_config = None  # BunkerVMConfig
 
 
 def set_globals(client, audit, vm_manager=None, config=None):
@@ -72,6 +72,7 @@ mcp = FastMCP(
 
 
 # ── Tool: Execute Command ──
+
 
 @mcp.tool()
 def sandbox_exec(
@@ -186,6 +187,7 @@ def sandbox_exec(
 
 # ── Tool: Read File ──
 
+
 @mcp.tool()
 def sandbox_read_file(path: str) -> str:
     """Read the contents of a file from the sandbox filesystem.
@@ -226,6 +228,7 @@ def sandbox_read_file(path: str) -> str:
 
 # ── Tool: Write File ──
 
+
 @mcp.tool()
 def sandbox_write_file(path: str, content: str, append: bool = False) -> str:
     """Write content to a file in the sandbox filesystem.
@@ -261,6 +264,7 @@ def sandbox_write_file(path: str, content: str, append: bool = False) -> str:
 
 
 # ── Tool: List Directory ──
+
 
 @mcp.tool()
 def sandbox_list_dir(path: str = "/") -> str:
@@ -307,6 +311,7 @@ def sandbox_list_dir(path: str = "/") -> str:
 
 # ── Tool: Sandbox Status ──
 
+
 @mcp.tool()
 def sandbox_status() -> str:
     """Get the current status of the sandbox VM.
@@ -336,7 +341,9 @@ def sandbox_status() -> str:
 
     if "cpu" in status:
         cpu = status["cpu"]
-        lines.append(f"  CPU:         {cpu.get('model', 'unknown')} ({cpu.get('cores', '?')} cores)")
+        lines.append(
+            f"  CPU:         {cpu.get('model', 'unknown')} ({cpu.get('cores', '?')} cores)"
+        )
 
     if "memory" in status:
         mem = status["memory"]
@@ -344,7 +351,9 @@ def sandbox_status() -> str:
         used = mem.get("used_bytes", 0) / 1_048_576
         available = mem.get("available_bytes", mem.get("free_bytes", 0)) / 1_048_576
         pct = (used / total * 100) if total > 0 else 0
-        lines.append(f"  Memory:      {used:.0f} / {total:.0f} MB ({pct:.0f}% used, {available:.0f} MB available)")
+        lines.append(
+            f"  Memory:      {used:.0f} / {total:.0f} MB ({pct:.0f}% used, {available:.0f} MB available)"
+        )
 
     if "disk" in status:
         disk = status["disk"]
@@ -352,11 +361,15 @@ def sandbox_status() -> str:
         used = disk.get("used_bytes", 0) / 1_048_576
         free = disk.get("free_bytes", 0) / 1_048_576
         pct = (used / total * 100) if total > 0 else 0
-        lines.append(f"  Disk:        {used:.0f} / {total:.0f} MB ({pct:.0f}% used, {free:.0f} MB free)")
+        lines.append(
+            f"  Disk:        {used:.0f} / {total:.0f} MB ({pct:.0f}% used, {free:.0f} MB free)"
+        )
 
     if "load" in status:
         ld = status["load"]
-        lines.append(f"  Load (1/5/15m): {ld.get('1m', 0):.2f} / {ld.get('5m', 0):.2f} / {ld.get('15m', 0):.2f}")
+        lines.append(
+            f"  Load (1/5/15m): {ld.get('1m', 0):.2f} / {ld.get('5m', 0):.2f} / {ld.get('15m', 0):.2f}"
+        )
 
     if "processes" in status:
         lines.append(f"  Processes:   {status['processes']}")
@@ -365,6 +378,7 @@ def sandbox_status() -> str:
 
 
 # ── Tool: Reset Sandbox ──
+
 
 @mcp.tool()
 def sandbox_upload_file(local_path: str, remote_path: str) -> str:
@@ -387,6 +401,7 @@ def sandbox_upload_file(local_path: str, remote_path: str) -> str:
     audit.log("upload_file", local_path=local_path, remote_path=remote_path)
 
     import os
+
     if not os.path.exists(local_path):
         return f"[ERROR] Local file not found: {local_path}"
 
@@ -423,6 +438,7 @@ def sandbox_download_file(remote_path: str, local_path: str) -> str:
     audit.log("download_file", remote_path=remote_path, local_path=local_path)
 
     import os
+
     try:
         data = client.download_file(remote_path)
     except Exception as e:

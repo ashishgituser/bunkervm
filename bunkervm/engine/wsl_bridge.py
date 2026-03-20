@@ -25,9 +25,7 @@ Usage from CLI::
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
-import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -106,11 +104,11 @@ class WSLBridge:
     def __post_init__(self):
         if self.distro is None:
             from .platform import default_wsl_distro
+
             self.distro = default_wsl_distro()
             if self.distro is None:
                 raise RuntimeError(
-                    "No WSL2 distro found.  Install one with:  "
-                    "wsl --install -d Ubuntu"
+                    "No WSL2 distro found.  Install one with:  " "wsl --install -d Ubuntu"
                 )
 
     # ── High-level lifecycle ──────────────────────────────────────
@@ -121,6 +119,7 @@ class WSLBridge:
 
         # 1. WSL2 itself
         from .platform import wsl2_available
+
         if not wsl2_available():
             problems.append("WSL2 is not installed or no version-2 distro found")
             return problems  # nothing else to check
@@ -138,12 +137,16 @@ class WSLBridge:
         # 3. Python 3 available
         r = wsl_bash(self.distro, "python3 --version", timeout=10)  # type: ignore[arg-type]
         if r.returncode != 0:
-            problems.append("python3 not found inside WSL — run: wsl sudo apt install python3 python3-venv")
+            problems.append(
+                "python3 not found inside WSL — run: wsl sudo apt install python3 python3-venv"
+            )
 
         # 4. /dev/kvm
         r = wsl_bash(self.distro, "test -r /dev/kvm && test -w /dev/kvm && echo ok", timeout=10)  # type: ignore[arg-type]
         if r.stdout.strip() != "ok":
-            problems.append("/dev/kvm not accessible — add nestedVirtualization=true to .wslconfig and restart WSL")
+            problems.append(
+                "/dev/kvm not accessible — add nestedVirtualization=true to .wslconfig and restart WSL"
+            )
 
         return problems
 
@@ -187,9 +190,7 @@ class WSLBridge:
         # Verify
         r = wsl_run(self.distro, "test", "-f", bunkervm_bin, timeout=10)  # type: ignore[arg-type]
         if r.returncode != 0:
-            raise RuntimeError(
-                f"Install succeeded but binary not found at {bunkervm_bin}"
-            )
+            raise RuntimeError(f"Install succeeded but binary not found at {bunkervm_bin}")
 
         logger.info("BunkerVM installed in WSL: %s", bunkervm_bin)
         self._bunkervm_bin = bunkervm_bin
@@ -232,7 +233,9 @@ class WSLBridge:
             # Block — let the user see output directly
             wsl_run(
                 self.distro,  # type: ignore[arg-type]
-                "bash", "-lc", cmd_parts,
+                "bash",
+                "-lc",
+                cmd_parts,
                 capture=False,
                 timeout=0,  # no timeout for foreground
             )
@@ -241,10 +244,7 @@ class WSLBridge:
         # Background: nohup + redirect output, disown
         home = self._get_home()
         log_file = f"{home}/.bunkervm/logs/engine.log"
-        bg_script = (
-            f"mkdir -p {home}/.bunkervm/logs && "
-            f"nohup {cmd_parts} >> {log_file} 2>&1 &"
-        )
+        bg_script = f"mkdir -p {home}/.bunkervm/logs && " f"nohup {cmd_parts} >> {log_file} 2>&1 &"
         r = wsl_bash(self.distro, bg_script, timeout=15)  # type: ignore[arg-type]
         if r.returncode != 0:
             logger.error("Failed to launch engine in WSL: %s", r.stderr.strip())
@@ -282,7 +282,7 @@ class WSLBridge:
         except (urllib.error.URLError, OSError):
             # Not running — clean up stale PID file inside WSL
             if self._bunkervm_bin:
-                wsl_bash(self.distro, f"rm -f ~/.bunkervm/engine/engine.pid", timeout=10)  # type: ignore[arg-type]
+                wsl_bash(self.distro, "rm -f ~/.bunkervm/engine/engine.pid", timeout=10)  # type: ignore[arg-type]
             return True
 
     def engine_status(self, port: int = DEFAULT_ENGINE_PORT) -> Optional[dict]:

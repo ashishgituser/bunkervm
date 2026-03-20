@@ -24,8 +24,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
-import shutil
 import threading
 from dataclasses import dataclass
 from typing import Dict, Optional
@@ -44,6 +42,7 @@ _BASE_PORT_OFFSET = 0
 @dataclass
 class VMInstance:
     """A running VM instance in the pool."""
+
     name: str
     manager: VMManager
     client: SandboxClient
@@ -113,7 +112,9 @@ class VMPool:
         """
         with self._lock:
             if name in self._instances:
-                raise ValueError(f"VM '{name}' already exists. Stop it first or use a different name.")
+                raise ValueError(
+                    f"VM '{name}' already exists. Stop it first or use a different name."
+                )
 
             if len(self._instances) >= self._max_vms:
                 raise ValueError(
@@ -137,8 +138,13 @@ class VMPool:
 
         vm = VMManager(config, network=use_network)
 
-        logger.info("Starting VM '%s' (CID=%d, cpus=%d, mem=%dMB)",
-                     name, config.vsock_cid, config.vcpu_count, config.mem_size_mib)
+        logger.info(
+            "Starting VM '%s' (CID=%d, cpus=%d, mem=%dMB)",
+            name,
+            config.vsock_cid,
+            config.vcpu_count,
+            config.mem_size_mib,
+        )
 
         try:
             vm.start()
@@ -265,6 +271,7 @@ class VMPool:
     ) -> BunkerVMConfig:
         """Create an isolated config copy for a VM instance."""
         import copy
+
         config = copy.deepcopy(self._base_config)
 
         # Unique vsock CID (must be unique per VM)

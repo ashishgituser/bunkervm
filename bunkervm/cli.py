@@ -59,7 +59,7 @@ def _print(msg: str = "", end: str = "\n") -> None:
 # ── Demo Command ──
 
 
-_DEMO_SCRIPT = '''\
+_DEMO_SCRIPT = """\
 import math, time
 
 print("=" * 50)
@@ -106,7 +106,7 @@ print("✓ Code ran safely inside a Firecracker microVM")
 print("✓ Full Linux environment (not a container)")
 print("✓ Hardware-level isolation via KVM")
 print("✓ VM will be destroyed after this demo")
-'''
+"""
 
 
 def cmd_demo(args: argparse.Namespace) -> int:
@@ -176,8 +176,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         }.get(ext, "python")
     else:
         _print(f"{_CROSS} Provide a file or use -c for inline code")
-        _print(f"  Usage: bunkervm run script.py")
-        _print(f"  Usage: bunkervm run -c \"print('hello')\"")
+        _print("  Usage: bunkervm run script.py")
+        _print("  Usage: bunkervm run -c \"print('hello')\"")
         return 1
 
     try:
@@ -211,6 +211,7 @@ def cmd_info(args: argparse.Namespace) -> int:
 
     # Version
     from . import __version__
+
     _print(f"  Version:    {_CYAN}{__version__}{_RESET}")
     _print(f"  Platform:   {platform.platform()}")
     _print(f"  Python:     {platform.python_version()}")
@@ -234,13 +235,14 @@ def cmd_info(args: argparse.Namespace) -> int:
                 _print(f"  KVM access: {_CROSS} permission denied (try: sudo chmod 666 /dev/kvm)")
         else:
             _print(f"  KVM:        {_CROSS} /dev/kvm not found")
-            _print(f"              WSL2: Add nestedVirtualization=true to .wslconfig")
+            _print("              WSL2: Add nestedVirtualization=true to .wslconfig")
     else:
         _print(f"  Linux:      {_YELLOW}! Not on Linux (use WSL2 on Windows){_RESET}")
 
     # Bundle
     _print()
     from .bootstrap import BUNDLE_DIR, REQUIRED_FILES
+
     bundle_ok = True
     for name, filename in REQUIRED_FILES.items():
         path = BUNDLE_DIR / filename
@@ -257,6 +259,7 @@ def cmd_info(args: argparse.Namespace) -> int:
     # Firecracker check
     _print()
     import shutil
+
     fc = shutil.which("firecracker")
     if fc:
         _print(f"  Firecracker: {_CHECK} {fc}")
@@ -278,30 +281,36 @@ _SUDOERS_FILE = "/etc/sudoers.d/bunkervm"
 # Platform helpers — thin wrappers around engine.platform (avoid heavy
 # import at module level so `bunkervm --help` stays fast).
 
+
 def _get_wsl_distro() -> str:
     from bunkervm.engine.platform import get_wsl_distro
+
     return get_wsl_distro()
 
 
 def _is_wsl() -> bool:
     from bunkervm.engine.platform import is_wsl
+
     return is_wsl()
 
 
 def _is_windows_workspace() -> bool:
     from bunkervm.engine.platform import is_windows_workspace
+
     return is_windows_workspace()
 
 
 def _wsl_run(distro: str, *args: str, timeout: int = 120):
     """Run a command inside WSL — delegates to wsl_bridge.wsl_run."""
     from bunkervm.engine.wsl_bridge import wsl_run
+
     return wsl_run(distro, *args, timeout=timeout)
 
 
 def _ensure_bunkervm_in_wsl(distro: str) -> str:
     """Ensure BunkerVM is installed in a WSL venv. Returns the bunkervm binary path."""
     from bunkervm.engine.wsl_bridge import WSLBridge
+
     bridge = WSLBridge(distro=distro)
     try:
         path = bridge.ensure_installed()
@@ -315,6 +324,7 @@ def _ensure_bunkervm_in_wsl(distro: str) -> str:
 def _is_network_enabled() -> bool:
     """Check if passwordless sudo for networking commands is configured."""
     import subprocess
+
     if sys.platform == "win32":
         try:
             distro = _get_wsl_distro()
@@ -326,7 +336,8 @@ def _is_network_enabled() -> bool:
         try:
             result = subprocess.run(
                 ["sudo", "-n", "ip", "link", "show"],
-                capture_output=True, timeout=5,
+                capture_output=True,
+                timeout=5,
             )
             return result.returncode == 0
         except Exception:
@@ -367,10 +378,7 @@ def cmd_vscode_setup(args: argparse.Namespace) -> int:
 
         config = {
             "servers": {
-                "bunkervm": {
-                    "command": "wsl",
-                    "args": ["-d", distro, "--", bunkervm_bin, "server"]
-                }
+                "bunkervm": {"command": "wsl", "args": ["-d", distro, "--", bunkervm_bin, "server"]}
             }
         }
     else:
@@ -378,21 +386,11 @@ def cmd_vscode_setup(args: argparse.Namespace) -> int:
         bunkervm_bin = shutil.which("bunkervm")
 
         if bunkervm_bin:
-            config = {
-                "servers": {
-                    "bunkervm": {
-                        "command": bunkervm_bin,
-                        "args": ["server"]
-                    }
-                }
-            }
+            config = {"servers": {"bunkervm": {"command": bunkervm_bin, "args": ["server"]}}}
         else:
             config = {
                 "servers": {
-                    "bunkervm": {
-                        "command": python_bin,
-                        "args": ["-m", "bunkervm", "server"]
-                    }
+                    "bunkervm": {"command": python_bin, "args": ["-m", "bunkervm", "server"]}
                 }
             }
 
@@ -408,7 +406,9 @@ def cmd_vscode_setup(args: argparse.Namespace) -> int:
                 existing = json.load(f)
             if "servers" in existing and "bunkervm" in existing.get("servers", {}):
                 _print(f"  {_CHECK} BunkerVM already configured in {mcp_path}")
-                _print(f"\n  {_DIM}To reconfigure, delete .vscode/mcp.json and run again.{_RESET}\n")
+                _print(
+                    f"\n  {_DIM}To reconfigure, delete .vscode/mcp.json and run again.{_RESET}\n"
+                )
                 return 0
             # Merge into existing config
             existing.setdefault("servers", {})
@@ -429,9 +429,9 @@ def cmd_vscode_setup(args: argparse.Namespace) -> int:
     _print(f"  {_CHECK} Created {mcp_path}")
     _print()
     _print(f"  {_BOLD}What's next:{_RESET}")
-    _print(f"  1. Reload VS Code ({_CYAN}Ctrl+Shift+P{_RESET} → \"Reload Window\")")
+    _print(f'  1. Reload VS Code ({_CYAN}Ctrl+Shift+P{_RESET} → "Reload Window")')
     _print(f"  2. Open Copilot Chat ({_CYAN}Ctrl+Shift+I{_RESET})")
-    _print(f"  {_DIM}Ask: \"Run this Python script in the sandbox\"{_RESET}")
+    _print(f'  {_DIM}Ask: "Run this Python script in the sandbox"{_RESET}')
     _print()
     _print(f"  {_DIM}Tools: sandbox_exec, sandbox_write_file, sandbox_read_file,{_RESET}")
     _print(f"  {_DIM}       sandbox_list_dir, sandbox_upload_file, sandbox_download_file,{_RESET}")
@@ -455,7 +455,9 @@ def cmd_enable_network(args: argparse.Namespace) -> int:
         distro = _get_wsl_distro()
         bunkervm_bin = _ensure_bunkervm_in_wsl(distro)
         if not bunkervm_bin:
-            _print(f"  {_CROSS} BunkerVM not found in WSL. Run {_CYAN}bunkervm vscode-setup{_RESET} first.\n")
+            _print(
+                f"  {_CROSS} BunkerVM not found in WSL. Run {_CYAN}bunkervm vscode-setup{_RESET} first.\n"
+            )
             return 1
 
         _print(f"  {_ARROW} Running in WSL ({distro})... enter your WSL password when prompted.\n")
@@ -482,6 +484,7 @@ def cmd_enable_network(args: argparse.Namespace) -> int:
 
     # Find actual paths for ip, sysctl, iptables
     import shutil
+
     ip_bin = shutil.which("ip") or "/usr/sbin/ip"
     sysctl_bin = shutil.which("sysctl") or "/usr/sbin/sysctl"
     iptables_bin = shutil.which("iptables") or "/usr/sbin/iptables"
@@ -504,7 +507,8 @@ def cmd_enable_network(args: argparse.Namespace) -> int:
         # Validate with visudo
         result = subprocess.run(
             ["visudo", "-c", "-f", _SUDOERS_FILE],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         if result.returncode != 0:
             os.remove(_SUDOERS_FILE)
@@ -523,8 +527,10 @@ def cmd_enable_network(args: argparse.Namespace) -> int:
     _print(f"    {_DIM}{sysctl_bin}{_RESET}   (IP forwarding)")
     _print(f"    {_DIM}{iptables_bin}{_RESET} (NAT rules)")
     _print()
-    _print(f"  {_BOLD}Next:{_RESET} Re-run {_CYAN}bunkervm vscode-setup{_RESET} to update VS Code config,")
-    _print(f"        or restart the MCP server in VS Code.")
+    _print(
+        f"  {_BOLD}Next:{_RESET} Re-run {_CYAN}bunkervm vscode-setup{_RESET} to update VS Code config,"
+    )
+    _print("        or restart the MCP server in VS Code.")
     _print()
     _print(f"  {_DIM}To undo: sudo rm {_SUDOERS_FILE}{_RESET}")
     _print()
@@ -537,6 +543,7 @@ def cmd_enable_network(args: argparse.Namespace) -> int:
 def _engine_url(port: int = None) -> str:
     """Get the engine base URL."""
     from bunkervm.engine.config import DEFAULT_ENGINE_PORT
+
     p = port or DEFAULT_ENGINE_PORT
     return f"http://127.0.0.1:{p}"
 
@@ -549,7 +556,9 @@ def _engine_request(method: str, path: str, body: dict = None, port: int = None)
     url = _engine_url(port) + path
     data = json.dumps(body).encode("utf-8") if body else None
     req = urllib.request.Request(
-        url, data=data, method=method,
+        url,
+        data=data,
+        method=method,
         headers={"Content-Type": "application/json"} if data else {},
     )
     try:
@@ -639,7 +648,7 @@ def _engine_start_linux(args: argparse.Namespace) -> int:
     from bunkervm.engine.daemon import EngineDaemon
 
     # Auto-detect WSL2 — bind to 0.0.0.0 so Windows can reach the engine
-    host = getattr(args, 'host', None) or None
+    host = getattr(args, "host", None) or None
     if host is None:
         in_wsl = _is_wsl()
         host = "0.0.0.0" if in_wsl else "127.0.0.1"
@@ -662,12 +671,24 @@ def _engine_start_linux(args: argparse.Namespace) -> int:
     if args.background:
         # Launch as background process
         import subprocess
-        cmd = [sys.executable, "-m", "bunkervm", "engine", "start",
-               "--host", host,
-               "--port", str(args.port),
-               "--max-sandboxes", str(args.max_sandboxes),
-               "--cpus", str(args.cpus),
-               "--memory", str(args.memory)]
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "bunkervm",
+            "engine",
+            "start",
+            "--host",
+            host,
+            "--port",
+            str(args.port),
+            "--max-sandboxes",
+            str(args.max_sandboxes),
+            "--cpus",
+            str(args.cpus),
+            "--memory",
+            str(args.memory),
+        ]
         # Don't pass --background again to avoid infinite recursion
         proc = subprocess.Popen(
             cmd,
@@ -708,8 +729,10 @@ def cmd_engine_stop(args: argparse.Namespace) -> int:
         _print(f"{_YELLOW}Engine is not running{_RESET}")
         # Clean up stale PID file (only meaningful on Linux / WSL)
         from bunkervm.engine.platform import is_windows
+
         if not is_windows():
             from bunkervm.engine.config import EngineConfig
+
             EngineConfig(port=args.port).clear_pid()
         return 0
     except Exception as e:
@@ -746,7 +769,9 @@ def cmd_sandbox_list(args: argparse.Namespace) -> int:
     try:
         data = _engine_request("GET", "/sandboxes", port=args.port)
     except ConnectionError:
-        _print(f"{_CROSS} Engine is not running. Start it with: {_CYAN}bunkervm engine start{_RESET}")
+        _print(
+            f"{_CROSS} Engine is not running. Start it with: {_CYAN}bunkervm engine start{_RESET}"
+        )
         return 1
 
     sandboxes = data.get("sandboxes", [])
@@ -756,7 +781,9 @@ def cmd_sandbox_list(args: argparse.Namespace) -> int:
         return 0
 
     # Table header
-    _print(f"\n{'ID':>10}  {'NAME':<20}  {'STATUS':<10}  {'CPUS':>4}  {'MEMORY':>8}  {'UPTIME':>10}")
+    _print(
+        f"\n{'ID':>10}  {'NAME':<20}  {'STATUS':<10}  {'CPUS':>4}  {'MEMORY':>8}  {'UPTIME':>10}"
+    )
     _print(f"{'─' * 10}  {'─' * 20}  {'─' * 10}  {'─' * 4}  {'─' * 8}  {'─' * 10}")
 
     for sb in sandboxes:
@@ -793,7 +820,9 @@ def cmd_sandbox_create(args: argparse.Namespace) -> int:
         _print()
         return 0
     except ConnectionError:
-        _print(f"\r{_CROSS} Engine is not running. Start it with: {_CYAN}bunkervm engine start{_RESET}")
+        _print(
+            f"\r{_CROSS} Engine is not running. Start it with: {_CYAN}bunkervm engine start{_RESET}"
+        )
         return 1
     except RuntimeError as e:
         _print(f"\r{_CROSS} {e}")
@@ -807,12 +836,13 @@ def cmd_sandbox_exec(args: argparse.Namespace) -> int:
 
     if not command:
         _print(f"{_CROSS} Provide a command to execute")
-        _print(f"  Usage: bunkervm sandbox exec <id|name> \"command\"")
+        _print('  Usage: bunkervm sandbox exec <id|name> "command"')
         return 1
 
     try:
         result = _engine_request(
-            "POST", f"/sandboxes/{sandbox_id}/exec",
+            "POST",
+            f"/sandboxes/{sandbox_id}/exec",
             body={"command": command, "timeout": args.timeout},
             port=args.port,
         )
@@ -869,7 +899,9 @@ def cmd_sandbox_logs(args: argparse.Namespace) -> int:
         # Also fetch VM-level status
         try:
             vm_status = _engine_request(
-                "GET", f"/sandboxes/{sandbox_id}/status", port=args.port,
+                "GET",
+                f"/sandboxes/{sandbox_id}/status",
+                port=args.port,
             )
             if vm_status.get("status") == "ok":
                 _print(f"  {_BOLD}VM Resources:{_RESET}")
@@ -942,10 +974,15 @@ examples:
     run_p = sub.add_parser("run", help="Run code inside a sandbox")
     run_p.add_argument("file", nargs="?", help="Script file to execute")
     run_p.add_argument("-c", "--code", help="Inline code to execute")
-    run_p.add_argument("-l", "--language", choices=["python", "bash", "node"],
-                       help="Language (auto-detected from extension)")
-    run_p.add_argument("-t", "--timeout", type=int, default=30,
-                       help="Execution timeout in seconds (default: 30)")
+    run_p.add_argument(
+        "-l",
+        "--language",
+        choices=["python", "bash", "node"],
+        help="Language (auto-detected from extension)",
+    )
+    run_p.add_argument(
+        "-t", "--timeout", type=int, default=30, help="Execution timeout in seconds (default: 30)"
+    )
     run_p.add_argument("--cpus", type=int, default=1, help="vCPUs (default: 1)")
     run_p.add_argument("--memory", type=int, default=512, help="Memory in MB (default: 512)")
     run_p.add_argument("--no-network", action="store_true", help="Disable internet in VM")
@@ -983,17 +1020,25 @@ examples:
     engine_sub = engine_p.add_subparsers(dest="engine_command")
 
     engine_start_p = engine_sub.add_parser("start", help="Start the engine daemon")
-    engine_start_p.add_argument("--host", type=str, default=None,
-                                help="Bind address (default: 0.0.0.0 in WSL, 127.0.0.1 on Linux)")
+    engine_start_p.add_argument(
+        "--host",
+        type=str,
+        default=None,
+        help="Bind address (default: 0.0.0.0 in WSL, 127.0.0.1 on Linux)",
+    )
     engine_start_p.add_argument("--port", type=int, default=9551, help="API port (default: 9551)")
-    engine_start_p.add_argument("--max-sandboxes", type=int, default=10,
-                                help="Max concurrent sandboxes (default: 10)")
-    engine_start_p.add_argument("--cpus", type=int, default=1,
-                                help="Default vCPUs per sandbox (default: 1)")
-    engine_start_p.add_argument("--memory", type=int, default=512,
-                                help="Default memory per sandbox in MB (default: 512)")
-    engine_start_p.add_argument("-d", "--background", action="store_true",
-                                help="Run engine in background")
+    engine_start_p.add_argument(
+        "--max-sandboxes", type=int, default=10, help="Max concurrent sandboxes (default: 10)"
+    )
+    engine_start_p.add_argument(
+        "--cpus", type=int, default=1, help="Default vCPUs per sandbox (default: 1)"
+    )
+    engine_start_p.add_argument(
+        "--memory", type=int, default=512, help="Default memory per sandbox in MB (default: 512)"
+    )
+    engine_start_p.add_argument(
+        "-d", "--background", action="store_true", help="Run engine in background"
+    )
     engine_start_p.set_defaults(func=cmd_engine_start)
 
     engine_stop_p = engine_sub.add_parser("stop", help="Stop the engine daemon")
@@ -1045,6 +1090,7 @@ examples:
         if len(sys.argv) > 1 and sys.argv[1].startswith("--"):
             # Legacy mode — delegate to __main__.main()
             from .__main__ import main as legacy_main
+
             legacy_main()
             return 0
         parser.print_help()
@@ -1091,5 +1137,6 @@ def cmd_server(args: argparse.Namespace) -> int:
     sys.argv = new_argv
 
     from .__main__ import main as legacy_main
+
     legacy_main()
     return 0

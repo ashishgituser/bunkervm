@@ -27,10 +27,8 @@ Usage:
 
 from __future__ import annotations
 
-import atexit
 import logging
 import sys
-import time
 from typing import Optional
 
 logger = logging.getLogger("bunkervm.runtime")
@@ -81,14 +79,25 @@ def run_code(
     engine = _try_engine_discovery()
     if engine is not None:
         return _run_code_via_engine(
-            engine, code, language=language, timeout=timeout,
-            cpus=cpus, memory=memory, network=network, quiet=quiet,
+            engine,
+            code,
+            language=language,
+            timeout=timeout,
+            cpus=cpus,
+            memory=memory,
+            network=network,
+            quiet=quiet,
         )
 
     # Fall back to direct Firecracker boot
     return _run_code_direct(
-        code, language=language, timeout=timeout,
-        cpus=cpus, memory=memory, network=network, quiet=quiet,
+        code,
+        language=language,
+        timeout=timeout,
+        cpus=cpus,
+        memory=memory,
+        network=network,
+        quiet=quiet,
     )
 
 
@@ -96,6 +105,7 @@ def _try_engine_discovery():
     """Try to discover a running engine. Returns EngineClient or None."""
     try:
         from .engine.discovery import discover_engine
+
         return discover_engine()
     except Exception:
         return None
@@ -215,13 +225,13 @@ def _run_code_direct(
         if language == "python":
             # Write code to a temp file and execute
             client.write_file("/tmp/_run.py", code)
-            result = client.exec(f"python3 /tmp/_run.py", timeout=timeout)
+            result = client.exec("python3 /tmp/_run.py", timeout=timeout)
         elif language == "bash":
             client.write_file("/tmp/_run.sh", code)
-            result = client.exec(f"bash /tmp/_run.sh", timeout=timeout)
+            result = client.exec("bash /tmp/_run.sh", timeout=timeout)
         elif language == "node":
             client.write_file("/tmp/_run.js", code)
-            result = client.exec(f"node /tmp/_run.js", timeout=timeout)
+            result = client.exec("node /tmp/_run.js", timeout=timeout)
         else:
             raise ValueError(f"Unsupported language: {language}")
 
@@ -366,6 +376,7 @@ class Sandbox:
         if self._engine_url:
             from .engine.client import EngineClient
             from .engine.discovery import parse_engine_url
+
             host, port = parse_engine_url(self._engine_url)
             return EngineClient(host=host, port=port)
 

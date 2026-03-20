@@ -27,26 +27,29 @@ from typing import Optional
 logger = logging.getLogger("bunkervm.sandbox")
 
 # Default timeouts
-_CONNECT_TIMEOUT = 5       # seconds to wait for connection
-_READ_TIMEOUT = 60         # seconds to wait for response (long commands)
-_HEALTH_TIMEOUT = 3        # seconds for health check
-_MAX_RETRIES = 2           # retry on transient failures
-_RETRY_DELAY = 0.5         # seconds between retries
-_RECV_BUF = 65536          # 64KB recv buffer
+_CONNECT_TIMEOUT = 5  # seconds to wait for connection
+_READ_TIMEOUT = 60  # seconds to wait for response (long commands)
+_HEALTH_TIMEOUT = 3  # seconds for health check
+_MAX_RETRIES = 2  # retry on transient failures
+_RETRY_DELAY = 0.5  # seconds between retries
+_RECV_BUF = 65536  # 64KB recv buffer
 
 
 class SandboxError(Exception):
     """Base exception for sandbox operations."""
+
     pass
 
 
 class SandboxConnectionError(SandboxError, ConnectionError):
     """Cannot reach the sandbox VM."""
+
     pass
 
 
 class SandboxTimeoutError(SandboxError, TimeoutError):
     """Operation timed out."""
+
     pass
 
 
@@ -104,7 +107,8 @@ class SandboxClient:
     ) -> dict:
         """Execute a shell command inside the sandbox."""
         return self._request(
-            "POST", "/exec",
+            "POST",
+            "/exec",
             {"command": command, "timeout": timeout, "workdir": workdir},
             timeout=timeout + 10,
         )
@@ -122,7 +126,8 @@ class SandboxClient:
     ) -> dict:
         """Write a file to the sandbox."""
         return self._request(
-            "POST", "/write-file",
+            "POST",
+            "/write-file",
             {"path": path, "content": content, "mode": mode, "encoding": encoding},
         )
 
@@ -137,17 +142,20 @@ class SandboxClient:
     ) -> dict:
         """Upload a file from host to sandbox (binary-safe via base64)."""
         import base64
+
         with open(local_path, "rb") as f:
             data = f.read()
         encoded = base64.b64encode(data).decode("ascii")
         return self._request(
-            "POST", "/write-file",
+            "POST",
+            "/write-file",
             {"path": remote_path, "content": encoded, "encoding": "base64", "mode": "overwrite"},
         )
 
     def download_file(self, remote_path: str) -> bytes:
         """Download a file from sandbox to host (returns raw bytes)."""
         import base64
+
         result = self._request("POST", "/read-file", {"path": remote_path})
         content = result.get("content", "")
         encoding = result.get("encoding", "utf-8")
@@ -175,7 +183,9 @@ class SandboxClient:
                     elapsed = timeout - (deadline - time.monotonic())
                     logger.info(
                         "Sandbox healthy (%s) after %d attempts (%.1fs)",
-                        self._mode, attempt, elapsed,
+                        self._mode,
+                        attempt,
+                        elapsed,
                     )
                     return True
             except Exception:
@@ -205,9 +215,7 @@ class SandboxClient:
         """
         uds_path = self._vsock_uds
         if not uds_path or not os.path.exists(uds_path):
-            raise SandboxConnectionError(
-                f"Vsock UDS not found: {uds_path}. Is the VM running?"
-            )
+            raise SandboxConnectionError(f"Vsock UDS not found: {uds_path}. Is the VM running?")
 
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(_CONNECT_TIMEOUT)
@@ -300,7 +308,7 @@ class SandboxClient:
 
                 # Parse HTTP response
                 if b"\r\n\r\n" not in raw:
-                    raise SandboxError(f"Malformed HTTP response from sandbox")
+                    raise SandboxError("Malformed HTTP response from sandbox")
 
                 header_bytes, _, resp_body = raw.partition(b"\r\n\r\n")
                 status_line = header_bytes.split(b"\r\n")[0].decode("utf-8")
@@ -325,9 +333,7 @@ class SandboxClient:
                 raise
 
             except TimeoutError:
-                raise SandboxTimeoutError(
-                    f"{method} {path} timed out after {timeout}s"
-                )
+                raise SandboxTimeoutError(f"{method} {path} timed out after {timeout}s")
 
             except json.JSONDecodeError as e:
                 raise SandboxError(f"Invalid JSON response: {e}")

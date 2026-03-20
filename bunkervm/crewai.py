@@ -117,7 +117,9 @@ class BunkerVMCrewTools(BunkerVMToolsBase):
 
         class WriteFileTool(BaseTool):
             name: str = "write_file"
-            description: str = "Write a file inside the BunkerVM sandbox. Creates parent dirs automatically."
+            description: str = (
+                "Write a file inside the BunkerVM sandbox. Creates parent dirs automatically."
+            )
             args_schema: Type[BaseModel] = WriteFileInput
 
             def _run(self, path: str, content: str) -> str:

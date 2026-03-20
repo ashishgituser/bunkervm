@@ -25,6 +25,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger("bunkervm.bootstrap")
 
@@ -49,6 +50,7 @@ REQUIRED_FILES = {
 @dataclass
 class BundlePaths:
     """Paths to the BunkerVM bundle components."""
+
     firecracker: str
     kernel: str
     rootfs: str
@@ -158,7 +160,7 @@ def _download_bundle(version: Optional[str] = None) -> bool:
             # Latest release
             url = f"https://github.com/{GITHUB_REPO}/releases/latest/download/{BUNDLE_FILENAME}"
 
-        _print_status(f"Downloading BunkerVM bundle (~100MB)...")
+        _print_status("Downloading BunkerVM bundle (~100MB)...")
         _print_status(f"  From: {url}")
 
         # Download to temp file
@@ -169,7 +171,7 @@ def _download_bundle(version: Optional[str] = None) -> bool:
             _download_with_progress(url, str(tmp_path))
         except (urllib.error.URLError, urllib.error.HTTPError, OSError) as e:
             logger.debug("Download failed: %s", e)
-            _print_status(f"  Download not available yet (this is expected for unreleased versions)")
+            _print_status("  Download not available yet (this is expected for unreleased versions)")
             if tmp_path.exists():
                 tmp_path.unlink()
             return False
@@ -256,7 +258,9 @@ def _try_dev_mode() -> Optional[BundlePaths]:
             if not fc_bin:
                 fc_bin = "/usr/local/bin/firecracker"
                 if not os.path.exists(fc_bin):
-                    _print_status("  Firecracker binary not found. Run: sudo bash build/setup-firecracker.sh")
+                    _print_status(
+                        "  Firecracker binary not found. Run: sudo bash build/setup-firecracker.sh"
+                    )
                     return None
 
             # Symlink/copy into bundle dir for consistency

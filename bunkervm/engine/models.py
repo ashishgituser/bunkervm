@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from typing import Optional
 
 
@@ -29,6 +29,7 @@ def _now() -> float:
 @dataclass
 class SandboxCreateRequest:
     """Request body for POST /sandboxes."""
+
     name: Optional[str] = None
     cpus: Optional[int] = None
     memory: Optional[int] = None
@@ -47,6 +48,7 @@ class SandboxCreateRequest:
 @dataclass
 class ExecRequest:
     """Request body for POST /sandboxes/{id}/exec."""
+
     command: str = ""
     timeout: int = 30
     workdir: str = "/root"
@@ -63,6 +65,7 @@ class ExecRequest:
 @dataclass
 class WriteFileRequest:
     """Request body for POST /sandboxes/{id}/write-file."""
+
     path: str = ""
     content: str = ""
 
@@ -80,6 +83,7 @@ class WriteFileRequest:
 @dataclass
 class SandboxInfo:
     """Info about a running sandbox, returned by list and get endpoints."""
+
     id: str
     name: str
     status: str  # "running", "starting", "stopped", "error"
@@ -101,6 +105,7 @@ class SandboxInfo:
 @dataclass
 class EngineStatus:
     """Response for GET /engine/status."""
+
     status: str = "running"  # "running", "stopping"
     version: str = ""
     platform: str = ""
@@ -115,6 +120,7 @@ class EngineStatus:
 @dataclass
 class ExecResult:
     """Response for POST /sandboxes/{id}/exec."""
+
     stdout: str = ""
     stderr: str = ""
     exit_code: int = 0
@@ -127,6 +133,7 @@ class ExecResult:
 @dataclass
 class ApiError:
     """Standard error response."""
+
     error: str
     detail: str = ""
 
