@@ -5,8 +5,8 @@
 <h1 align="center">BunkerVM</h1>
 
 <p align="center">
-  <strong>Docker Desktop for AI sandboxing.</strong><br>
-  Double-click to install. Hardware-isolated VMs for your AI agents.
+  <strong>Self-hosted AI sandbox with hardware isolation.</strong><br>
+  Your data never leaves your machine. Not a container — a real VM.
 </p>
 
 <p align="center">
@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/isolation-hardware%20(KVM)-22d3ee" alt="Isolation">
   <img src="https://img.shields.io/badge/boot-~3s-fb923c" alt="Boot time">
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
-  <a href="https://github.com/ashishgituser/bunkervm/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-green" alt="License"></a>
+  <a href="https://github.com/ashishgituser/bunkervm/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License"></a>
 </p>
 
 <p align="center">
@@ -24,58 +24,7 @@
 
 ---
 
-## Demo — LangGraph Multi-Agent Pipeline
-
-3 AI agents, 3 isolated Firecracker VMs, running in parallel. Build, test, and security-scan — then nuke one VM and watch the others survive.
-
-https://github.com/ashishgituser/bunkervm/raw/main/docs/LangGraphMultiAgentTest.mp4
-
----
-
-## BunkerDesktop — One-Click Sandbox Manager
-
-<p align="center">
-  <img src="docs/BunkerDesktop.png" alt="BunkerDesktop — Desktop App" width="800" />
-</p>
-
-**BunkerDesktop** is the easiest way to run BunkerVM. Download the installer, double-click, done.
-
-- **Native Windows app** — no browser, no terminal, no Docker
-- **Automatic WSL2 + backend setup** — the installer handles everything
-- **Dashboard** — create, monitor, and destroy sandboxes with a click
-- **Live logs** — filter by sandbox, log level, auto-scroll
-- **Start on login** — engine runs in the background, always ready
-
-### Install
-
-1. Download **BunkerDesktopSetup.exe** from [Releases](https://github.com/ashishgituser/bunkervm/releases)
-2. Run the installer — it sets up WSL2, installs the backend, creates shortcuts
-3. Launch BunkerDesktop from your desktop
-
-That's it. No `pip install`, no WSL commands, no config files.
-
-> **Windows may block the installer** because it's not yet code-signed. Here's how to fix it:
->
-> **If you see "Windows protected your PC" (SmartScreen):**
-> Click **"More info"** → **"Run anyway"**. Or right-click the `.exe` → **Properties** → check **"Unblock"** → OK.
->
-> **If the app is blocked entirely with no "Run anyway" option (Smart App Control):**
-> Windows 11's Smart App Control blocks all unsigned apps with no bypass. To fix:
-> 1. Open **Windows Security** → **App & browser control** → **Smart App Control settings**
-> 2. Switch from **On** to **Off**
-> 3. Run the installer
->
-> ⚠️ *Turning off Smart App Control is permanent — it cannot be re-enabled without resetting Windows. This is a [known Microsoft limitation](https://support.microsoft.com/en-us/topic/smart-app-control-285ea03d-fa88-4b54-bfb0-a40191834e56).*
->
-> Code signing is coming soon — once signed, both SmartScreen and Smart App Control will allow the installer automatically.
-
-> **VS Code + Copilot users:** BunkerDesktop runs the engine in the background. Once it's running, Copilot Chat automatically connects to it — every tool call runs in a hardware-isolated VM.
-
----
-
-## For Developers — `pip install bunkervm`
-
-If you prefer the command line or want to integrate BunkerVM into your own code:
+## Quickstart — 3 lines
 
 ```bash
 pip install bunkervm
@@ -90,56 +39,39 @@ print(result)  # Hello from a microVM!
 
 One function. VM boots (~3s), code runs, VM dies. **Your host was never touched.**
 
-<details>
-<summary><strong>See <code>bunkervm demo</code> output</strong></summary>
-
-```
-  ╔══════════════════════════════════════╗
-  ║         BunkerVM Demo                ║
-  ║  Hardware-isolated AI sandbox        ║
-  ╚══════════════════════════════════════╝
-
-Starting BunkerVM...
-Launching Firecracker microVM...
-Running code inside sandbox...
-
-OS:       Linux-6.1.102-x86_64-with
-Hostname: bunkervm
-Python:   3.12.12
-
-Prime numbers under 100:
-2 3 5 7 11 13 17 19 23 29 31 37 41 43 47 53 59 61 67 71 73 79 83 89 97
-
-✓ Code ran safely inside a Firecracker microVM
-✓ Full Linux environment (not a container)
-✓ Hardware-level isolation via KVM
-✓ VM will be destroyed after this demo
-
-Done. ✓ Demo completed in 3.6s
-```
-
-</details>
-
 ---
 
 ## The Problem
 
-AI agents generate and execute code on _your_ machine. One bad LLM output and your files, credentials, or entire system could be gone. Docker shares the kernel — [container escapes are real](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=docker+escape). You need **hardware isolation**.
+AI agents generate and execute code on _your_ machine. One bad LLM output and your files, credentials, or entire system could be gone. Docker shares the kernel — [container escapes are real](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=docker+escape). Cloud sandboxes send your data to someone else's server.
 
-**The fix:** BunkerVM boots a Firecracker microVM in **~3 seconds**, runs the code inside a throwaway Linux sandbox with its own kernel, and destroys everything after.
+**The fix:** BunkerVM boots a [Firecracker](https://firecracker-microvm.github.io/) microVM in **~3 seconds**, runs the code inside a throwaway Linux sandbox with its own kernel, and destroys everything after. **Self-hosted. Your data stays on your machine.**
 
 ---
 
-## Why Not Docker?
+## Why BunkerVM?
 
-|  | BunkerDesktop | BunkerVM (CLI) | Docker |
+|  | **BunkerVM** | **E2B** | **Docker** |
 |---|---|---|---|
-| **Setup** | Double-click installer | `pip install bunkervm` | Dockerfile + build + run |
-| **Isolation** | Hardware (KVM) | Hardware (KVM) | Shared kernel |
+| **Self-hosted** | ✅ Runs on your machine | ❌ Cloud only | ✅ Self-hosted |
+| **Data privacy** | ✅ Never leaves your network | ❌ Sent to cloud | ✅ Local |
+| **Isolation** | 🔒 Hardware (KVM) — own kernel | 🔒 Hardware (Firecracker) | ⚠️ Shared kernel |
 | **Escape risk** | Near zero | Near zero | [Container escapes exist](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=docker+escape) |
-| **Boot time** | ~3s | ~3s | ~0.5s |
-| **Dashboard** | Built-in GUI | Web dashboard | Docker Desktop |
-| **Target user** | Everyone | Developers | DevOps |
+| **Cost** | **Free forever** | Per-execution pricing | Free |
+| **Setup** | `pip install bunkervm` | API key + cloud account | Dockerfile + build + run |
+| **Boot time** | ~3s | ~1s (remote) | ~0.5s |
+| **Offline / air-gapped** | ✅ Works without internet | ❌ Requires internet | ✅ Works offline |
+| **License** | Apache-2.0 | Proprietary (client only OSS) | Apache-2.0 |
+
+**Choose BunkerVM when:** your data can't leave your network (finance, healthcare, defense, government), you want zero cloud costs, or you need air-gapped deployments.
+
+---
+
+## Demo — LangGraph Multi-Agent Pipeline
+
+3 AI agents, 3 isolated Firecracker VMs, running in parallel. Build, test, and security-scan — then nuke one VM and watch the others survive.
+
+https://github.com/ashishgituser/bunkervm/raw/main/docs/LangGraphMultiAgentTest.mp4
 
 ---
 
@@ -274,9 +206,9 @@ pip install bunkervm[all]    # LangChain + OpenAI Agents SDK + CrewAI
 
 ## VS Code + Copilot
 
-> **Every line of code Copilot runs — hardware-isolated.**
+> **Every line of code Copilot executes — hardware-isolated.**
 
-### Option A: BunkerDesktop (recommended)
+### Option A: BunkerDesktop (recommended for Windows)
 
 Just install BunkerDesktop and it works. The engine runs in the background and VS Code auto-connects.
 
@@ -292,15 +224,6 @@ That's it. Reload VS Code (`Ctrl+Shift+P` → "Reload Window"). Copilot Chat now
 > **Windows users:** These commands run in your normal PowerShell terminal.
 > `vscode-setup` auto-detects Windows, creates an isolated Python environment inside WSL,
 > installs BunkerVM there, and generates the correct config. You don't need to touch WSL directly.
-
-### Enable internet inside the VM (optional)
-
-```bash
-bunkervm enable-network
-```
-
-On Windows this auto-proxies into WSL and prompts for your Linux password.
-On Linux, prefix with `sudo`.
 
 ### How it works
 
@@ -323,34 +246,54 @@ Open Copilot Chat and ask:
 
 <video src="docs/BunkerVMVSCodeDemo.mp4" controls width="100%" alt="BunkerVM VS Code + Copilot demo"></video>
 
-<details>
-<summary>What <code>bunkervm vscode-setup</code> generates</summary>
+---
 
-Linux:
-```json
-{
-  "servers": {
-    "bunkervm": {
-      "command": "/usr/local/bin/bunkervm",
-      "args": ["server"]
-    }
-  }
-}
+## How It Works
+
+```
+Your AI Agent
+     │
+     ▼
+  bunkervm        ──vsock──▶   Firecracker MicroVM
+  (host)                       ┌──────────────────┐
+                               │  Alpine Linux     │
+                               │  Python 3.12      │
+                               │  Full toolchain   │
+                               │  exec_agent       │
+                               └──────────────────┘
+                               Hardware isolation (KVM)
+                               Destroyed after use
 ```
 
-Windows (auto-detected — installs in WSL venv automatically):
-```json
-{
-  "servers": {
-    "bunkervm": {
-      "command": "wsl",
-      "args": ["-d", "Ubuntu", "--", "/home/you/.bunkervm/venv/bin/bunkervm", "server"]
-    }
-  }
-}
-```
+- **[Firecracker](https://firecracker-microvm.github.io/)** — Amazon's micro-VM engine (powers AWS Lambda & Fargate)
+- **vsock** — Zero-config host↔VM communication (no networking required)
+- **~100MB bundle** — Firecracker + kernel + rootfs, auto-downloaded on first run
 
-</details>
+---
+
+## BunkerDesktop — One-Click Sandbox Manager (Windows)
+
+<p align="center">
+  <img src="docs/BunkerDesktop.png" alt="BunkerDesktop — Desktop App" width="800" />
+</p>
+
+**BunkerDesktop** is the easiest way to run BunkerVM. Download the installer, double-click, done.
+
+- **Native Windows app** — no browser, no terminal, no Docker
+- **Automatic WSL2 + backend setup** — the installer handles everything
+- **Dashboard** — create, monitor, and destroy sandboxes with a click
+- **Live logs** — filter by sandbox, log level, auto-scroll
+- **Start on login** — engine runs in the background, always ready
+
+### Install
+
+1. Download **BunkerDesktopSetup.exe** from [Releases](https://github.com/ashishgituser/bunkervm/releases)
+2. Run the installer — it sets up WSL2, installs the backend, creates shortcuts
+3. Launch BunkerDesktop from your desktop
+
+> **Windows may block the installer** because it's not yet code-signed.
+> SmartScreen: Click **"More info"** → **"Run anyway"**.
+> Code signing is coming soon.
 
 ---
 
@@ -374,15 +317,18 @@ State persists between `run()` calls — variables, imports, everything stays.
 </details>
 
 <details>
-<summary><strong>Secure AI Agent</strong> — One-line agent sandboxing</summary>
+<summary><strong>Multi-VM Support</strong> — Run multiple sandboxes simultaneously</summary>
 
 ```python
-from bunkervm import secure_agent
+from bunkervm import VMPool
 
-runtime = secure_agent()
-result = runtime.run("print('Sandboxed!')")
-print(result)
-runtime.stop()
+pool = VMPool(max_vms=5)
+pool.start("agent-1", cpus=2, memory=1024)
+pool.start("agent-2", cpus=1, memory=512)
+
+pool.client("agent-1").exec("echo 'I am agent 1'")
+pool.client("agent-2").exec("echo 'I am agent 2'")
+pool.stop_all()
 ```
 
 </details>
@@ -413,23 +359,6 @@ Windows (WSL2):
     }
   }
 }
-```
-
-</details>
-
-<details>
-<summary><strong>Multi-VM Support</strong> — Run multiple sandboxes simultaneously</summary>
-
-```python
-from bunkervm import VMPool
-
-pool = VMPool(max_vms=5)
-pool.start("agent-1", cpus=2, memory=1024)
-pool.start("agent-2", cpus=1, memory=512)
-
-pool.client("agent-1").exec("echo 'I am agent 1'")
-pool.client("agent-2").exec("echo 'I am agent 2'")
-pool.stop_all()
 ```
 
 </details>
@@ -483,29 +412,6 @@ Options:
 ```
 
 </details>
-
----
-
-## How It Works
-
-```
-Your AI Agent
-     │
-     ▼
-  bunkervm        ──vsock──▶   Firecracker MicroVM
-  (host)                       ┌──────────────────┐
-                               │  Alpine Linux     │
-                               │  Python 3.12      │
-                               │  Full toolchain   │
-                               │  exec_agent       │
-                               └──────────────────┘
-                               Hardware isolation (KVM)
-                               Destroyed after use
-```
-
-- **[Firecracker](https://firecracker-microvm.github.io/)** — Amazon's micro-VM engine (powers AWS Lambda)
-- **vsock** — Zero-config host↔VM communication
-- **~100MB bundle** — Firecracker + kernel + rootfs, auto-downloaded on first run
 
 ---
 
@@ -570,9 +476,17 @@ bunkervm demo
 
 ---
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for our security model and how to report vulnerabilities.
+
 ## License
 
-AGPL-3.0 — Free for personal and open-source use.
+Apache-2.0 — Free for personal, open-source, and commercial use.
 
 ---
 

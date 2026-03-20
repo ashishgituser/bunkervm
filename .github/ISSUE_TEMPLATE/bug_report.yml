@@ -1,0 +1,54 @@
+name: Bug Report
+description: Report a bug in BunkerVM
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting a bug! Please fill in the details below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Install bunkervm
+        2. Run `bunkervm demo`
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+
+  - type: textarea
+    id: info
+    attributes:
+      label: Environment
+      description: Paste the output of `bunkervm info` and your OS details.
+      placeholder: |
+        OS: Ubuntu 24.04 / Windows 11 WSL2
+        Python: 3.12
+        BunkerVM: 0.8.6
+        bunkervm info output: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output
+      description: Any relevant error messages or logs.
+      render: shell

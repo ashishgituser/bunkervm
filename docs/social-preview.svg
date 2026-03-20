@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050508"/>
+      <stop offset="50%" stop-color="#0c0c18"/>
+      <stop offset="100%" stop-color="#050508"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7c5cfc"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+    <linearGradient id="accent2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7c5cfc"/>
+      <stop offset="100%" stop-color="#f472b6"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="40" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- Grid pattern -->
+  <g opacity="0.04" stroke="#7c5cfc" stroke-width="1">
+    <line x1="0" y1="0" x2="0" y2="640"/><line x1="64" y1="0" x2="64" y2="640"/>
+    <line x1="128" y1="0" x2="128" y2="640"/><line x1="192" y1="0" x2="192" y2="640"/>
+    <line x1="256" y1="0" x2="256" y2="640"/><line x1="320" y1="0" x2="320" y2="640"/>
+    <line x1="384" y1="0" x2="384" y2="640"/><line x1="448" y1="0" x2="448" y2="640"/>
+    <line x1="512" y1="0" x2="512" y2="640"/><line x1="576" y1="0" x2="576" y2="640"/>
+    <line x1="640" y1="0" x2="640" y2="640"/><line x1="704" y1="0" x2="704" y2="640"/>
+    <line x1="768" y1="0" x2="768" y2="640"/><line x1="832" y1="0" x2="832" y2="640"/>
+    <line x1="896" y1="0" x2="896" y2="640"/><line x1="960" y1="0" x2="960" y2="640"/>
+    <line x1="1024" y1="0" x2="1024" y2="640"/><line x1="1088" y1="0" x2="1088" y2="640"/>
+    <line x1="1152" y1="0" x2="1152" y2="640"/><line x1="1216" y1="0" x2="1216" y2="640"/>
+    <line x1="0" y1="0" x2="1280" y2="0"/><line x1="0" y1="64" x2="1280" y2="64"/>
+    <line x1="0" y1="128" x2="1280" y2="128"/><line x1="0" y1="192" x2="1280" y2="192"/>
+    <line x1="0" y1="256" x2="1280" y2="256"/><line x1="0" y1="320" x2="1280" y2="320"/>
+    <line x1="0" y1="384" x2="1280" y2="384"/><line x1="0" y1="448" x2="1280" y2="448"/>
+    <line x1="0" y1="512" x2="1280" y2="512"/><line x1="0" y1="576" x2="1280" y2="576"/>
+  </g>
+
+  <!-- Glowing orbs -->
+  <circle cx="200" cy="150" r="200" fill="#7c5cfc" opacity="0.06" filter="url(#softglow)"/>
+  <circle cx="1080" cy="500" r="180" fill="#22d3ee" opacity="0.05" filter="url(#softglow)"/>
+  <circle cx="640" cy="320" r="250" fill="#7c5cfc" opacity="0.03" filter="url(#softglow)"/>
+
+  <!-- Shield icon -->
+  <g transform="translate(640, 170)" filter="url(#glow)">
+    <path d="M0-70 L50-50 L50 10 C50 45 25 70 0 80 C-25 70 -50 45 -50 10 L-50-50 Z"
+          fill="none" stroke="url(#accent)" stroke-width="3" opacity="0.9"/>
+    <path d="M0-45 L30-30 L30 5 C30 30 15 48 0 55 C-15 48 -30 30 -30 5 L-30-30 Z"
+          fill="url(#accent)" opacity="0.15"/>
+    <!-- Lock icon inside shield -->
+    <rect x="-12" y="-8" width="24" height="20" rx="3" fill="none" stroke="url(#accent)" stroke-width="2.5"/>
+    <path d="M-8-8 L-8-16 C-8-24 8-24 8-16 L8-8" fill="none" stroke="url(#accent)" stroke-width="2.5"/>
+    <circle cx="0" cy="2" r="3" fill="url(#accent)"/>
+  </g>
+
+  <!-- Title -->
+  <text x="640" y="290" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-weight="800" font-size="72" fill="url(#accent)">BunkerVM</text>
+
+  <!-- Tagline -->
+  <text x="640" y="345" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-weight="400" font-size="28" fill="#e8e8f0">Self-hosted AI sandbox with hardware isolation</text>
+
+  <!-- Subtitle -->
+  <text x="640" y="390" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-weight="400" font-size="20" fill="#6b6b80">Firecracker microVMs for AI agents. No cloud. No Docker. No risk.</text>
+
+  <!-- Feature pills -->
+  <g transform="translate(640, 440)">
+    <!-- KVM Isolation -->
+    <rect x="-390" y="-18" width="150" height="36" rx="18" fill="#12121c" stroke="#1a1a2e" stroke-width="1"/>
+    <text x="-315" y="6" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="500" font-size="13" fill="#22d3ee">KVM Isolation</text>
+
+    <!-- ~3s Boot -->
+    <rect x="-210" y="-18" width="120" height="36" rx="18" fill="#12121c" stroke="#1a1a2e" stroke-width="1"/>
+    <text x="-150" y="6" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="500" font-size="13" fill="#fb923c">~3s Boot</text>
+
+    <!-- pip install -->
+    <rect x="-60" y="-18" width="160" height="36" rx="18" fill="#12121c" stroke="#1a1a2e" stroke-width="1"/>
+    <text x="20" y="6" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="500" font-size="13" fill="#34d399">pip install</text>
+
+    <!-- Self-hosted -->
+    <rect x="130" y="-18" width="150" height="36" rx="18" fill="#12121c" stroke="#1a1a2e" stroke-width="1"/>
+    <text x="205" y="6" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="500" font-size="13" fill="#f472b6">Self-hosted</text>
+  </g>
+
+  <!-- Code line at bottom -->
+  <text x="640" y="520" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="400" font-size="16" fill="#6b6b80">
+    <tspan fill="#34d399">$</tspan> pip install bunkervm
+  </text>
+
+  <!-- Frameworks -->
+  <text x="640" y="565" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-weight="400" font-size="15" fill="#4a4a60">Works with LangChain · OpenAI Agents · CrewAI · VS Code Copilot · Claude Desktop</text>
+
+  <!-- URL -->
+  <text x="640" y="610" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-weight="500" font-size="16" fill="#7c5cfc">github.com/ashishgituser/bunkervm</text>
+</svg>
