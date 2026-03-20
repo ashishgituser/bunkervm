@@ -137,10 +137,24 @@ class EngineClient:
         local_path: str,
         remote_path: str,
     ) -> Dict[str, Any]:
-        """Upload a file: read locally, write via engine API."""
-        with open(local_path, "r") as f:
-            content = f.read()
-        return self.write_file(sandbox_id, remote_path, content)
+        """Upload a file: read locally, write via engine API.
+
+        Handles both text and binary files. Tries UTF-8 first;
+        falls back to base64 encoding for binary content.
+        """
+        import base64 as _b64
+
+        try:
+            with open(local_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return self.write_file(sandbox_id, remote_path, content)
+        except (UnicodeDecodeError, ValueError):
+            with open(local_path, "rb") as f:
+                content = _b64.b64encode(f.read()).decode("ascii")
+            return self._post(
+                f"/sandboxes/{sandbox_id}/write-file",
+                {"path": remote_path, "content": content, "encoding": "base64"},
+            )
 
     def download_file(self, sandbox_id: str, remote_path: str) -> str:
         """Download a file: read via engine API, return content."""

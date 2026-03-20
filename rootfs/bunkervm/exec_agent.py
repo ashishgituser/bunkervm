@@ -41,8 +41,11 @@ LISTEN_PORT = int(os.environ.get("EXEC_PORT", "8080"))
 VSOCK_PORT = int(os.environ.get("VSOCK_PORT", "8080"))
 MAX_OUTPUT = 65536          # 64KB max stdout/stderr per command
 MAX_FILE_READ = 2097152     # 2MB max file read
+MAX_FILE_WRITE = 10485760   # 10MB max file write
 DEFAULT_TIMEOUT = 30        # 30s default command timeout
 MAX_TIMEOUT = 300           # 5min absolute maximum
+MAX_PROCS = 256             # max processes per command (prevent fork bombs)
+MAX_MEM_KB = 1048576        # 1GB virtual memory limit per command
 
 # VSOCK CID constants (in case socket module doesn't define them)
 VMADDR_CID_ANY = getattr(_socket, "VMADDR_CID_ANY", 0xFFFFFFFF)
@@ -112,7 +115,7 @@ class ExecHandler(http.server.BaseHTTPRequestHandler):
     # ── Handlers ──
 
     def _handle_exec(self, body: dict):
-        """Execute a shell command."""
+        """Execute a shell command with resource limits."""
         command = body.get("command", "")
         if not command or not command.strip():
             self._send_json(400, {"error": "command is required"})
@@ -123,10 +126,20 @@ class ExecHandler(http.server.BaseHTTPRequestHandler):
         if not os.path.isdir(workdir):
             workdir = "/"
 
+        # Wrap command with resource limits:
+        # - ulimit -v: cap virtual memory (prevents OOM from eating the whole VM)
+        # - ulimit -u: cap max user processes (prevents fork bombs)
+        # The limits are advisory defense-in-depth; the VM itself is the real boundary.
+        limited_cmd = (
+            f"ulimit -v {MAX_MEM_KB} 2>/dev/null; "
+            f"ulimit -u {MAX_PROCS} 2>/dev/null; "
+            f"{command}"
+        )
+
         start_time = time.monotonic()
         try:
             result = subprocess.run(
-                command,
+                limited_cmd,
                 shell=True,
                 capture_output=True,
                 text=True,
@@ -215,6 +228,14 @@ class ExecHandler(http.server.BaseHTTPRequestHandler):
 
         if not path:
             self._send_json(400, {"error": "path is required"})
+            return
+
+        # Check content size before writing
+        content_bytes = len(content.encode("utf-8")) if isinstance(content, str) else len(content)
+        if content_bytes > MAX_FILE_WRITE:
+            self._send_json(400, {
+                "error": f"content too large: {content_bytes} bytes (max {MAX_FILE_WRITE})"
+            })
             return
 
         try:
