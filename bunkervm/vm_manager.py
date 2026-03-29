@@ -284,7 +284,7 @@ class VMManager:
         """Active rootfs path (working copy if available)."""
         return self._rootfs_copy or self.config.rootfs_path
 
-    def create_snapshot(self, name: str) -> "SnapshotInfo":
+    def create_snapshot(self, name: str):
         """Create a snapshot of the running VM.
 
         Pauses the VM, saves state + memory + rootfs, then resumes.
