@@ -199,30 +199,57 @@ Snapshot = Firecracker's native `PUT /snapshot/create`. Not a filesystem copy. T
 `record=True` automatically chains traces and snapshots into a session timeline.
 
 ```python
+# test_replay.py
+from bunkervm import Sandbox
+
 with Sandbox(record=True) as sb:
     sb.run("x = 42")
-    sb.run("print(x * 2)")
-    sb.run("open('/output/result.txt', 'w').write(str(x))")
+    print("Result:", sb.run("print(x * 2)"))
 
-# Session auto-saved to ~/.bunkervm/sessions/
+    # Create directory first, then write file
+    sb.run("import os; os.makedirs('/tmp/output', exist_ok=True)")
+    sb.run("open('/tmp/output/result.txt', 'w').write(str(x))")
+    print("File content:", sb.run("print(open('/tmp/output/result.txt').read())"))
+
+    print("\nHistory:")
+    for step in sb.history():
+        print(f"  Step {step['step']}: {step['command'][:60]}")
+```
+
+```
+$ python test_replay.py
+Starting sandbox via BunkerVM engine...
+Sandbox ready (via engine).
+Result: 84
+File content: 42
+
+History:
+  Step 1: x = 42
+  Step 2: print(x * 2)
+  Step 3: import os; os.makedirs('/tmp/output', exist_ok=True)
+  Step 4: open('/tmp/output/result.txt', 'w').write(str(x))
+  Step 5: print(open('/tmp/output/result.txt').read())
+Session saved to ~/.bunkervm/sessions/d0c13cb74d85.json
+Destroying sandbox...
+Done.
 ```
 
 ```bash
-bunkervm replay a1b2c3 --trace
+bunkervm replay d0c13cb74d85 --trace
 ```
 
 ```
-Session: a1b2c3
-  Steps: 3
-  Recorded: 2026-03-29 14:30
+Session: d0c13cb74d85
+  Steps: 5
+  Recorded: 2026-03-29 23:15
 
 Timeline:
 
-  📸 step   1  [ok]     12ms  python3 /tmp/_runner.py
-  📸 step   2  [ok]      8ms  python3 /tmp/_runner.py
-  📸 step   3  [ok]     15ms  python3 /tmp/_runner.py
-            + 1 files created (42 bytes)
-              + /output/result.txt (42b)
+     step   1  [ok]      34ms  x = 42
+     step   2  [ok]      23ms  print(x * 2)
+     step   3  [ok]      22ms  import os; os.makedirs('/tmp/output', exist_ok=True)
+     step   4  [ok]      21ms  open('/tmp/output/result.txt', 'w').write(str(x))
+     step   5  [ok]      21ms  print(open('/tmp/output/result.txt').read())
 ```
 
 Each 📸 = a restorable VM snapshot. You can `restore(step=2)` and branch from there.
