@@ -680,16 +680,15 @@ class Sandbox:
     def restore(self, step: int) -> None:
         """Restore the VM to a previously recorded checkpoint.
 
-        This stops the current VM and boots a new one from the snapshot
-        taken at the given step. All state (filesystem, memory, processes)
-        reverts to exactly what they were after that step completed.
+        In direct mode (Linux + KVM): uses Firecracker snapshots for
+        instant full-state restore (memory, filesystem, processes).
+
+        In engine mode (Windows/macOS): replays commands 1..step in a
+        fresh Python namespace to reconstruct variable state.
 
         Args:
             step: The step number to restore to (1-indexed).
         """
-        if self._vm is None:
-            raise RuntimeError("Time-travel restore requires direct mode")
-
         # Find the checkpoint
         cp = None
         for c in self._checkpoints:
@@ -698,32 +697,50 @@ class Sandbox:
                 break
         if cp is None:
             raise ValueError(f"No checkpoint found for step {step}")
-        if cp["snapshot_name"] is None:
-            raise ValueError(f"Step {step} has no VM snapshot (trace-only checkpoint)")
-
-        from .vm_manager import VMManager
-
-        if not isinstance(self._vm, VMManager):
-            raise RuntimeError("Time-travel restore requires VMManager")
 
         if not self._quiet:
             _print(f"Restoring to step {step}...")
 
-        # Stop current VM
-        self._vm.stop()
+        if self._vm is not None and cp.get("snapshot_name"):
+            # Direct mode: full VM snapshot restore
+            from .vm_manager import VMManager
 
-        # Restore from snapshot
-        self._vm.start_from_snapshot(cp["snapshot_name"])
+            if isinstance(self._vm, VMManager):
+                self._vm.stop()
+                self._vm.start_from_snapshot(cp["snapshot_name"])
 
-        # Reconnect client
-        from .sandbox_client import SandboxClient
+                from .sandbox_client import SandboxClient
 
-        self._client = SandboxClient(
-            vsock_uds=self._vm.config.vsock_uds_path,
-            vsock_port=self._vm.config.vm_port,
-        )
-        if not self._client.wait_for_health(timeout=15):
-            raise RuntimeError("VM restored but sandbox agent is not responding")
+                self._client = SandboxClient(
+                    vsock_uds=self._vm.config.vsock_uds_path,
+                    vsock_port=self._vm.config.vm_port,
+                )
+                if not self._client.wait_for_health(timeout=15):
+                    raise RuntimeError("VM restored but sandbox agent is not responding")
+        else:
+            # Engine/fallback mode: replay commands in fresh namespace
+            if self._client is None:
+                raise RuntimeError("Sandbox not started")
+
+            # Clear the persisted Python namespace
+            self._client.exec("rm -f /tmp/_ns.pkl", timeout=5)
+
+            # Re-execute commands 1..step (skip non-code checkpoints)
+            was_recording = self._record
+            self._record = False  # Don't re-record during replay
+            try:
+                for c in self._checkpoints:
+                    if c["step"] > step:
+                        break
+                    cmd = c["command"]
+                    if cmd.startswith("[manual checkpoint:"):
+                        continue
+                    try:
+                        self.run(cmd)
+                    except RuntimeError:
+                        pass  # Replay best-effort
+            finally:
+                self._record = was_recording
 
         # Trim checkpoints to the restored point
         self._checkpoints = [c for c in self._checkpoints if c["step"] <= step]
