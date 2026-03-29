@@ -127,9 +127,7 @@ class FirecrackerAPIClient:
 
             if status_code >= 400:
                 error_msg = resp_body.decode("utf-8", errors="replace") if resp_body else ""
-                raise RuntimeError(
-                    f"Firecracker API error {status_code}: {error_msg}"
-                )
+                raise RuntimeError(f"Firecracker API error {status_code}: {error_msg}")
 
             if not resp_body.strip():
                 return {}

@@ -566,9 +566,7 @@ class Sandbox:
         if self._client is None:
             raise RuntimeError("Sandbox not started. Call .start() or use 'with Sandbox()'")
 
-        result = self._client.exec(
-            command, timeout=timeout or self._timeout, trace=self._record
-        )
+        result = self._client.exec(command, timeout=timeout or self._timeout, trace=self._record)
 
         # Auto-checkpoint if recording
         if self._record:
@@ -641,9 +639,7 @@ class Sandbox:
                 logger.warning("Auto-checkpoint snapshot failed (step %d): %s", step, e)
 
         self._checkpoints.append(checkpoint)
-        logger.debug(
-            "Checkpoint step=%d snapshot=%s", step, checkpoint["snapshot_name"]
-        )
+        logger.debug("Checkpoint step=%d snapshot=%s", step, checkpoint["snapshot_name"])
 
     def checkpoint(self, name: Optional[str] = None) -> dict:
         """Manually create a named checkpoint of the current VM state.

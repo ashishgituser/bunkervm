@@ -1007,7 +1007,9 @@ def cmd_replay(args: argparse.Namespace) -> int:
     # Show full timeline
     _print(f"\n{_BOLD}Session: {sid}{_RESET}")
     _print(f"  Steps: {total}")
-    _print(f"  Recorded: {time.strftime('%Y-%m-%d %H:%M', time.localtime(session.get('created_at', 0)))}")
+    _print(
+        f"  Recorded: {time.strftime('%Y-%m-%d %H:%M', time.localtime(session.get('created_at', 0)))}"
+    )
     _print(f"\n{_BOLD}Timeline:{_RESET}\n")
 
     for cp in checkpoints:
@@ -1023,7 +1025,9 @@ def cmd_replay(args: argparse.Namespace) -> int:
         else:
             status = f"{_RED}exit {exit_code}{_RESET}"
 
-        _print(f"  {has_snap} {_DIM}step {step:3d}{_RESET}  [{status}]  {duration:6.0f}ms  {cmd[:70]}")
+        _print(
+            f"  {has_snap} {_DIM}step {step:3d}{_RESET}  [{status}]  {duration:6.0f}ms  {cmd[:70]}"
+        )
 
         if args.trace and cp.get("trace"):
             _print_trace(cp["trace"], indent=12)
@@ -1125,8 +1129,12 @@ def cmd_diff(args: argparse.Namespace) -> int:
 
     # Text format
     _print(f"\n{_BOLD}Agent Diff{_RESET}")
-    _print(f"  Session A: {_CYAN}{session_a.get('session_id', '?')}{_RESET} ({result['summary']['steps_a']} steps)")
-    _print(f"  Session B: {_CYAN}{session_b.get('session_id', '?')}{_RESET} ({result['summary']['steps_b']} steps)")
+    _print(
+        f"  Session A: {_CYAN}{session_a.get('session_id', '?')}{_RESET} ({result['summary']['steps_a']} steps)"
+    )
+    _print(
+        f"  Session B: {_CYAN}{session_b.get('session_id', '?')}{_RESET} ({result['summary']['steps_b']} steps)"
+    )
     _print()
 
     # Summary
@@ -1377,9 +1385,7 @@ examples:
     # ── replay (time-travel) ──
     replay_p = sub.add_parser("replay", help="Replay a recorded sandbox session")
     replay_p.add_argument("session", help="Session ID or path to session JSON")
-    replay_p.add_argument(
-        "--step", type=int, help="Show details for a specific step"
-    )
+    replay_p.add_argument("--step", type=int, help="Show details for a specific step")
     replay_p.add_argument(
         "--trace", action="store_true", help="Show filesystem trace for each step"
     )
