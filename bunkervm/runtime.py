@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from typing import Optional
 
 logger = logging.getLogger("bunkervm.runtime")
@@ -609,15 +610,13 @@ class Sandbox:
         Saves the command, output, trace, and optionally a VM snapshot
         (direct mode only) for full state restoration.
         """
-        import time as _time
-
         self._step_counter += 1
         step = self._step_counter
         snap_name = f"{self._session_id}-step{step}"
 
         checkpoint = {
             "step": step,
-            "timestamp": _time.time(),
+            "timestamp": time.time(),
             "command": command,
             "exit_code": result.get("exit_code", -1),
             "stdout": result.get("stdout", "")[:4096],  # truncate for storage
@@ -655,8 +654,6 @@ class Sandbox:
         if self._vm is None:
             raise RuntimeError("Manual checkpoints require direct mode (not engine)")
 
-        import time as _time
-
         self._step_counter += 1
         snap_name = name or f"{self._session_id or 'manual'}-cp{self._step_counter}"
 
@@ -667,7 +664,7 @@ class Sandbox:
 
         checkpoint = {
             "step": self._step_counter,
-            "timestamp": _time.time(),
+            "timestamp": time.time(),
             "command": f"[manual checkpoint: {snap_name}]",
             "exit_code": 0,
             "stdout": "",
@@ -754,7 +751,6 @@ class Sandbox:
             Path to the saved session file.
         """
         import json
-        import time as _time
 
         if not path:
             import os
@@ -766,7 +762,7 @@ class Sandbox:
 
         session = {
             "session_id": self._session_id,
-            "created_at": _time.time(),
+            "created_at": time.time(),
             "total_steps": self._step_counter,
             "checkpoints": self._checkpoints,
         }
