@@ -35,13 +35,14 @@ CLI:
     bunkervm server --transport sse  # Start MCP server
 """
 
-__version__ = "0.8.6"
+__version__ = "0.9.0"
 
 # ── Core API (always available) ──
 from bunkervm.sandbox_client import SandboxClient  # noqa: F401
 from bunkervm.multi_vm import VMPool  # noqa: F401
 from bunkervm.runtime import run_code, Sandbox  # noqa: F401
 from bunkervm.agent_runtime import secure_agent, SecureAgentRuntime  # noqa: F401
+from bunkervm.snapshot import SnapshotManager, SnapshotInfo  # noqa: F401
 
 # ── Engine API (thin client to engine daemon) ──
 from bunkervm.engine.client import EngineClient  # noqa: F401
@@ -54,6 +55,8 @@ __all__ = [
     "SandboxClient",
     "SecureAgentRuntime",
     "VMPool",
+    "SnapshotManager",
+    "SnapshotInfo",
     "EngineClient",
     "discover_engine",
     "is_engine_running",

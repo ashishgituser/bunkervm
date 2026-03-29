@@ -285,6 +285,7 @@ class Sandbox:
         timeout: int = 30,
         quiet: bool = False,
         engine_url: Optional[str] = None,
+        record: bool = False,
     ):
         self._cpus = cpus
         self._memory = memory
@@ -292,20 +293,34 @@ class Sandbox:
         self._timeout = timeout
         self._quiet = quiet
         self._engine_url = engine_url  # explicit engine override
+        self._record = record
         # Direct mode state
         self._vm: Optional[object] = None
         self._client: Optional[object] = None
         # Engine mode state
         self._engine: Optional[object] = None
         self._engine_sandbox_id: Optional[str] = None
+        # Time-travel recording state
+        self._session_id: Optional[str] = None
+        self._checkpoints: list[dict] = []  # ordered list of checkpoint records
+        self._step_counter: int = 0
 
     def start(self) -> "Sandbox":
         """Boot the sandbox VM.
 
         Tries engine daemon first, then falls back to direct Firecracker.
+        If record=True, initializes a time-travel session.
         """
         if self._client is not None:
             return self
+
+        # Initialize recording session
+        if self._record:
+            import uuid
+
+            self._session_id = uuid.uuid4().hex[:12]
+            self._checkpoints = []
+            self._step_counter = 0
 
         # Try engine mode first
         engine = self._resolve_engine()
@@ -452,6 +467,13 @@ class Sandbox:
 
     def stop(self) -> None:
         """Destroy the sandbox VM."""
+        # Auto-save session if recording
+        if self._record and self._checkpoints:
+            try:
+                self.save_session()
+            except Exception as e:
+                logger.warning("Failed to auto-save session: %s", e)
+
         if self._engine is not None and self._engine_sandbox_id:
             # Engine mode: destroy via engine API
             if not self._quiet:
@@ -487,6 +509,9 @@ class Sandbox:
             sb.run("x = 42")
             sb.run("print(x)")  # 42
 
+        When record=True, each execution is traced and a checkpoint is
+        saved for time-travel debugging.
+
         Args:
             code: Source code to execute.
             language: "python", "bash", or "node".
@@ -499,23 +524,28 @@ class Sandbox:
             raise RuntimeError("Sandbox not started. Call .start() or use 'with Sandbox()'")
 
         t = timeout or self._timeout
+        use_trace = self._record
 
         if language == "python":
             # Use the persistent namespace runner
             self._client.write_file("/tmp/_code.py", code)
-            result = self._client.exec("python3 /tmp/_runner.py", timeout=t)
+            result = self._client.exec("python3 /tmp/_runner.py", timeout=t, trace=use_trace)
         elif language == "bash":
             self._client.write_file("/tmp/_run.sh", code)
-            result = self._client.exec("bash /tmp/_run.sh", timeout=t)
+            result = self._client.exec("bash /tmp/_run.sh", timeout=t, trace=use_trace)
         elif language == "node":
             self._client.write_file("/tmp/_run.js", code)
-            result = self._client.exec("node /tmp/_run.js", timeout=t)
+            result = self._client.exec("node /tmp/_run.js", timeout=t, trace=use_trace)
         else:
             raise ValueError(f"Unsupported language: {language}")
 
         stdout = result.get("stdout", "")
         stderr = result.get("stderr", "")
         exit_code = result.get("exit_code", -1)
+
+        # Auto-checkpoint if recording
+        if self._record:
+            self._auto_checkpoint(code, result)
 
         if exit_code != 0:
             error_msg = stderr.strip() or f"Code exited with status {exit_code}"
@@ -536,7 +566,14 @@ class Sandbox:
         if self._client is None:
             raise RuntimeError("Sandbox not started. Call .start() or use 'with Sandbox()'")
 
-        result = self._client.exec(command, timeout=timeout or self._timeout)
+        result = self._client.exec(
+            command, timeout=timeout or self._timeout, trace=self._record
+        )
+
+        # Auto-checkpoint if recording
+        if self._record:
+            self._auto_checkpoint(command, result)
+
         return result.get("stdout", "")
 
     def upload(self, local_path: str, remote_path: str) -> None:
@@ -555,6 +592,195 @@ class Sandbox:
     def client(self):
         """Direct access to the SandboxClient for advanced usage."""
         return self._client
+
+    # ── Time-Travel Debugging ──
+
+    @property
+    def session_id(self) -> Optional[str]:
+        """Session ID for the current recording (None if not recording)."""
+        return self._session_id
+
+    @property
+    def recording(self) -> bool:
+        """Whether this sandbox is recording checkpoints."""
+        return self._record
+
+    def _auto_checkpoint(self, command: str, result: dict) -> None:
+        """Record a checkpoint after each execution (when record=True).
+
+        Saves the command, output, trace, and optionally a VM snapshot
+        (direct mode only) for full state restoration.
+        """
+        import time as _time
+
+        self._step_counter += 1
+        step = self._step_counter
+        snap_name = f"{self._session_id}-step{step}"
+
+        checkpoint = {
+            "step": step,
+            "timestamp": _time.time(),
+            "command": command,
+            "exit_code": result.get("exit_code", -1),
+            "stdout": result.get("stdout", "")[:4096],  # truncate for storage
+            "stderr": result.get("stderr", "")[:4096],
+            "duration_ms": result.get("duration_ms", 0),
+            "trace": result.get("trace"),
+            "snapshot_name": None,
+        }
+
+        # Create VM snapshot if in direct mode (engine mode can't snapshot)
+        if self._vm is not None:
+            try:
+                from .vm_manager import VMManager
+
+                if isinstance(self._vm, VMManager) and self._vm.is_running():
+                    self._vm.create_snapshot(snap_name)
+                    checkpoint["snapshot_name"] = snap_name
+            except Exception as e:
+                logger.warning("Auto-checkpoint snapshot failed (step %d): %s", step, e)
+
+        self._checkpoints.append(checkpoint)
+        logger.debug(
+            "Checkpoint step=%d snapshot=%s", step, checkpoint["snapshot_name"]
+        )
+
+    def checkpoint(self, name: Optional[str] = None) -> dict:
+        """Manually create a named checkpoint of the current VM state.
+
+        Args:
+            name: Optional checkpoint name. Auto-generated if omitted.
+
+        Returns:
+            Checkpoint record dict.
+        """
+        if self._client is None:
+            raise RuntimeError("Sandbox not started")
+        if self._vm is None:
+            raise RuntimeError("Manual checkpoints require direct mode (not engine)")
+
+        import time as _time
+
+        self._step_counter += 1
+        snap_name = name or f"{self._session_id or 'manual'}-cp{self._step_counter}"
+
+        from .vm_manager import VMManager
+
+        if isinstance(self._vm, VMManager):
+            self._vm.create_snapshot(snap_name)
+
+        checkpoint = {
+            "step": self._step_counter,
+            "timestamp": _time.time(),
+            "command": f"[manual checkpoint: {snap_name}]",
+            "exit_code": 0,
+            "stdout": "",
+            "stderr": "",
+            "duration_ms": 0,
+            "trace": None,
+            "snapshot_name": snap_name,
+        }
+        self._checkpoints.append(checkpoint)
+        return checkpoint
+
+    def restore(self, step: int) -> None:
+        """Restore the VM to a previously recorded checkpoint.
+
+        This stops the current VM and boots a new one from the snapshot
+        taken at the given step. All state (filesystem, memory, processes)
+        reverts to exactly what they were after that step completed.
+
+        Args:
+            step: The step number to restore to (1-indexed).
+        """
+        if self._vm is None:
+            raise RuntimeError("Time-travel restore requires direct mode")
+
+        # Find the checkpoint
+        cp = None
+        for c in self._checkpoints:
+            if c["step"] == step:
+                cp = c
+                break
+        if cp is None:
+            raise ValueError(f"No checkpoint found for step {step}")
+        if cp["snapshot_name"] is None:
+            raise ValueError(f"Step {step} has no VM snapshot (trace-only checkpoint)")
+
+        from .vm_manager import VMManager
+
+        if not isinstance(self._vm, VMManager):
+            raise RuntimeError("Time-travel restore requires VMManager")
+
+        if not self._quiet:
+            _print(f"Restoring to step {step}...")
+
+        # Stop current VM
+        self._vm.stop()
+
+        # Restore from snapshot
+        self._vm.start_from_snapshot(cp["snapshot_name"])
+
+        # Reconnect client
+        from .sandbox_client import SandboxClient
+
+        self._client = SandboxClient(
+            vsock_uds=self._vm.config.vsock_uds_path,
+            vsock_port=self._vm.config.vm_port,
+        )
+        if not self._client.wait_for_health(timeout=15):
+            raise RuntimeError("VM restored but sandbox agent is not responding")
+
+        # Trim checkpoints to the restored point
+        self._checkpoints = [c for c in self._checkpoints if c["step"] <= step]
+        self._step_counter = step
+
+        if not self._quiet:
+            _print(f"Restored to step {step}. Sandbox ready.")
+
+    def history(self) -> list[dict]:
+        """Return the checkpoint history for this recording session.
+
+        Returns:
+            List of checkpoint records, each containing:
+              step, timestamp, command, exit_code, stdout, stderr,
+              duration_ms, trace, snapshot_name.
+        """
+        return list(self._checkpoints)
+
+    def save_session(self, path: Optional[str] = None) -> str:
+        """Save the recording session to a JSON file.
+
+        Args:
+            path: Output file path. Auto-generated if omitted.
+
+        Returns:
+            Path to the saved session file.
+        """
+        import json
+        import time as _time
+
+        if not path:
+            import os
+
+            sessions_dir = os.path.join(os.path.expanduser("~"), ".bunkervm", "sessions")
+            os.makedirs(sessions_dir, exist_ok=True)
+            sid = self._session_id or "unknown"
+            path = os.path.join(sessions_dir, f"{sid}.json")
+
+        session = {
+            "session_id": self._session_id,
+            "created_at": _time.time(),
+            "total_steps": self._step_counter,
+            "checkpoints": self._checkpoints,
+        }
+
+        with open(path, "w") as f:
+            json.dump(session, f, indent=2, default=str)
+
+        if not self._quiet:
+            _print(f"Session saved to {path}")
+        return path
 
     def __enter__(self) -> "Sandbox":
         self.start()

@@ -47,8 +47,96 @@ MAX_TIMEOUT = 300           # 5min absolute maximum
 MAX_PROCS = 256             # max processes per command (prevent fork bombs)
 MAX_MEM_KB = 1048576        # 1GB virtual memory limit per command
 
+# Directories excluded from filesystem tracing (system/virtual/internal)
+_TRACE_EXCLUDE = {
+    "/proc", "/sys", "/dev", "/run", "/tmp/_ns.pkl", "/tmp/_code.py",
+    "/tmp/_runner.py", "/tmp/_run.py", "/tmp/_run.sh", "/tmp/_run.js",
+}
+
 # VSOCK CID constants (in case socket module doesn't define them)
 VMADDR_CID_ANY = getattr(_socket, "VMADDR_CID_ANY", 0xFFFFFFFF)
+
+
+# ── Filesystem tracing helpers (stdlib only) ──
+
+def _should_trace(path):
+    """Return True if this path should be included in traces."""
+    for excl in _TRACE_EXCLUDE:
+        if path == excl or path.startswith(excl + "/"):
+            return False
+    return True
+
+
+def _snapshot_filesystem():
+    """Walk the filesystem and record {path: (mtime, size)} for traceable paths."""
+    snapshot = {}
+    for scan_dir in ("/root", "/home", "/tmp", "/var", "/opt", "/data", "/output"):
+        if not os.path.isdir(scan_dir):
+            continue
+        for dirpath, dirnames, filenames in os.walk(scan_dir):
+            if not _should_trace(dirpath):
+                continue
+            for fname in filenames:
+                fpath = os.path.join(dirpath, fname)
+                if not _should_trace(fpath):
+                    continue
+                try:
+                    st = os.stat(fpath)
+                    snapshot[fpath] = (st.st_mtime, st.st_size)
+                except OSError:
+                    pass
+    return snapshot
+
+
+def _diff_filesystem(pre_snapshot):
+    """Compare current filesystem to a pre-execution snapshot.
+
+    Returns a trace dict with files_created, files_modified, files_deleted,
+    and bytes_written.
+    """
+    post_snapshot = _snapshot_filesystem()
+
+    created = []
+    modified = []
+    deleted = []
+    bytes_written = 0
+
+    # Files that exist now but didn't before → created
+    # Files that exist in both but changed → modified
+    for path, (mtime, size) in post_snapshot.items():
+        if path not in pre_snapshot:
+            created.append({"path": path, "size": size})
+            bytes_written += size
+        else:
+            old_mtime, old_size = pre_snapshot[path]
+            if mtime != old_mtime or size != old_size:
+                modified.append({"path": path, "old_size": old_size, "new_size": size})
+                bytes_written += max(0, size - old_size)
+
+    # Files that existed before but not now → deleted
+    for path in pre_snapshot:
+        if path not in post_snapshot:
+            deleted.append({"path": path, "size": pre_snapshot[path][1]})
+
+    # Collect files read by looking at atime changes (best-effort)
+    files_read = []
+    for path, (mtime, size) in post_snapshot.items():
+        if path in pre_snapshot and path not in [m["path"] for m in modified]:
+            try:
+                st = os.stat(path)
+                old_mtime = pre_snapshot[path][0]
+                if st.st_atime > old_mtime and st.st_mtime == old_mtime:
+                    files_read.append(path)
+            except OSError:
+                pass
+
+    return {
+        "files_created": created,
+        "files_modified": modified,
+        "files_deleted": deleted,
+        "files_read": files_read,
+        "bytes_written": bytes_written,
+    }
 
 
 class ExecHandler(http.server.BaseHTTPRequestHandler):
@@ -115,7 +203,7 @@ class ExecHandler(http.server.BaseHTTPRequestHandler):
     # ── Handlers ──
 
     def _handle_exec(self, body: dict):
-        """Execute a shell command with resource limits."""
+        """Execute a shell command with resource limits and optional filesystem tracing."""
         command = body.get("command", "")
         if not command or not command.strip():
             self._send_json(400, {"error": "command is required"})
@@ -123,13 +211,16 @@ class ExecHandler(http.server.BaseHTTPRequestHandler):
 
         timeout = min(max(body.get("timeout", DEFAULT_TIMEOUT), 1), MAX_TIMEOUT)
         workdir = body.get("workdir", "/root")
+        trace_enabled = body.get("trace", False)
         if not os.path.isdir(workdir):
             workdir = "/"
 
-        # Wrap command with resource limits:
-        # - ulimit -v: cap virtual memory (prevents OOM from eating the whole VM)
-        # - ulimit -u: cap max user processes (prevents fork bombs)
-        # The limits are advisory defense-in-depth; the VM itself is the real boundary.
+        # Capture filesystem state before execution (if tracing)
+        pre_snapshot = None
+        if trace_enabled:
+            pre_snapshot = _snapshot_filesystem()
+
+        # Wrap command with resource limits
         limited_cmd = (
             f"ulimit -v {MAX_MEM_KB} 2>/dev/null; "
             f"ulimit -u {MAX_PROCS} 2>/dev/null; "
@@ -155,22 +246,32 @@ class ExecHandler(http.server.BaseHTTPRequestHandler):
                 },
             )
             elapsed = time.monotonic() - start_time
-            self._send_json(200, {
+
+            response = {
                 "exit_code": result.returncode,
                 "stdout": result.stdout[:MAX_OUTPUT],
                 "stderr": result.stderr[:MAX_OUTPUT],
                 "duration_ms": round(elapsed * 1000, 1),
                 "truncated": len(result.stdout) > MAX_OUTPUT or len(result.stderr) > MAX_OUTPUT,
-            })
+            }
+
+            # Compute filesystem diff if tracing
+            if trace_enabled and pre_snapshot is not None:
+                response["trace"] = _diff_filesystem(pre_snapshot)
+
+            self._send_json(200, response)
         except subprocess.TimeoutExpired:
             elapsed = time.monotonic() - start_time
-            self._send_json(200, {
+            response = {
                 "exit_code": -1,
                 "stdout": "",
                 "stderr": f"Command timed out after {timeout}s",
                 "duration_ms": round(elapsed * 1000, 1),
                 "timed_out": True,
-            })
+            }
+            if trace_enabled and pre_snapshot is not None:
+                response["trace"] = _diff_filesystem(pre_snapshot)
+            self._send_json(200, response)
         except Exception as e:
             self._send_json(500, {"error": f"execution failed: {e}"})
 

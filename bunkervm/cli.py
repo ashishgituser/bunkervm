@@ -16,6 +16,10 @@ Commands:
     bunkervm sandbox create         # Create a new sandbox
     bunkervm sandbox exec           # Execute command in a sandbox
     bunkervm sandbox destroy        # Destroy a sandbox
+    bunkervm replay <session>       # Replay a recorded time-travel session
+    bunkervm snapshot list          # List VM snapshots
+    bunkervm snapshot delete <name> # Delete a VM snapshot
+    bunkervm diff <a> <b>           # Compare two agent sessions side-by-side
 
 Usage:
     pip install bunkervm
@@ -931,6 +935,292 @@ def cmd_sandbox_logs(args: argparse.Namespace) -> int:
         return 1
 
 
+# ── Replay (Time-Travel) ──
+
+
+def _load_session(session_ref: str) -> dict:
+    """Load a session from an ID or file path."""
+    # Try as a file path first
+    if os.path.isfile(session_ref):
+        with open(session_ref) as f:
+            return json.load(f)
+
+    # Try as a session ID in ~/.bunkervm/sessions/
+    sessions_dir = os.path.join(os.path.expanduser("~"), ".bunkervm", "sessions")
+    session_path = os.path.join(sessions_dir, f"{session_ref}.json")
+    if os.path.isfile(session_path):
+        with open(session_path) as f:
+            return json.load(f)
+
+    # Try partial match
+    if os.path.isdir(sessions_dir):
+        for name in os.listdir(sessions_dir):
+            if name.startswith(session_ref) and name.endswith(".json"):
+                with open(os.path.join(sessions_dir, name)) as f:
+                    return json.load(f)
+
+    raise FileNotFoundError(f"Session not found: {session_ref}")
+
+
+def cmd_replay(args: argparse.Namespace) -> int:
+    """Replay a recorded sandbox session."""
+    try:
+        session = _load_session(args.session)
+    except FileNotFoundError as e:
+        _print(f"{_CROSS} {e}")
+        return 1
+
+    checkpoints = session.get("checkpoints", [])
+    sid = session.get("session_id", "unknown")
+    total = session.get("total_steps", len(checkpoints))
+
+    if args.step:
+        # Show details for a specific step
+        cp = None
+        for c in checkpoints:
+            if c["step"] == args.step:
+                cp = c
+                break
+        if cp is None:
+            _print(f"{_CROSS} Step {args.step} not found in session {sid}")
+            return 1
+
+        _print(f"\n{_BOLD}Session {sid} — Step {cp['step']}/{total}{_RESET}\n")
+        _print(f"  {_DIM}Command:{_RESET}  {cp['command']}")
+        _print(f"  {_DIM}Exit:{_RESET}     {cp['exit_code']}")
+        _print(f"  {_DIM}Duration:{_RESET} {cp.get('duration_ms', 0):.0f}ms")
+        if cp.get("snapshot_name"):
+            _print(f"  {_DIM}Snapshot:{_RESET} {_GREEN}{cp['snapshot_name']}{_RESET}")
+        if cp.get("stdout"):
+            _print(f"\n  {_BOLD}stdout:{_RESET}")
+            for line in cp["stdout"].splitlines()[:20]:
+                _print(f"    {line}")
+        if cp.get("stderr"):
+            _print(f"\n  {_BOLD}stderr:{_RESET}")
+            for line in cp["stderr"].splitlines()[:10]:
+                _print(f"    {_YELLOW}{line}{_RESET}")
+        if args.trace and cp.get("trace"):
+            _print_trace(cp["trace"])
+        _print()
+        return 0
+
+    # Show full timeline
+    _print(f"\n{_BOLD}Session: {sid}{_RESET}")
+    _print(f"  Steps: {total}")
+    _print(f"  Recorded: {time.strftime('%Y-%m-%d %H:%M', time.localtime(session.get('created_at', 0)))}")
+    _print(f"\n{_BOLD}Timeline:{_RESET}\n")
+
+    for cp in checkpoints:
+        step = cp["step"]
+        cmd = cp["command"]
+        exit_code = cp["exit_code"]
+        duration = cp.get("duration_ms", 0)
+        has_snap = "📸" if cp.get("snapshot_name") else "  "
+
+        # Color code the exit status
+        if exit_code == 0:
+            status = f"{_GREEN}ok{_RESET}"
+        else:
+            status = f"{_RED}exit {exit_code}{_RESET}"
+
+        _print(f"  {has_snap} {_DIM}step {step:3d}{_RESET}  [{status}]  {duration:6.0f}ms  {cmd[:70]}")
+
+        if args.trace and cp.get("trace"):
+            _print_trace(cp["trace"], indent=12)
+
+    _print()
+    return 0
+
+
+def _print_trace(trace: dict, indent: int = 6) -> None:
+    """Print filesystem trace data."""
+    pad = " " * indent
+    created = trace.get("files_created", [])
+    modified = trace.get("files_modified", [])
+    deleted = trace.get("files_deleted", [])
+    bytes_w = trace.get("bytes_written", 0)
+
+    if created:
+        _print(f"{pad}{_GREEN}+ {len(created)} files created{_RESET}", end="")
+        if bytes_w:
+            _print(f" ({bytes_w} bytes)", end="")
+        _print()
+        for f in created[:5]:
+            _print(f"{pad}  {_GREEN}+ {f['path']}{_RESET} ({f.get('size', '?')}b)")
+        if len(created) > 5:
+            _print(f"{pad}  ... and {len(created) - 5} more")
+
+    if modified:
+        _print(f"{pad}{_YELLOW}~ {len(modified)} files modified{_RESET}")
+        for f in modified[:5]:
+            _print(f"{pad}  {_YELLOW}~ {f['path']}{_RESET}")
+
+    if deleted:
+        _print(f"{pad}{_RED}- {len(deleted)} files deleted{_RESET}")
+        for f in deleted[:5]:
+            _print(f"{pad}  {_RED}- {f['path']}{_RESET}")
+
+
+# ── Snapshot Management ──
+
+
+def cmd_snapshot_list(args: argparse.Namespace) -> int:
+    """List available VM snapshots."""
+    from .snapshot import SnapshotManager
+
+    mgr = SnapshotManager()
+    snapshots = mgr.list()
+
+    if not snapshots:
+        _print(f"\n  {_DIM}No snapshots found.{_RESET}")
+        _print(f"  Create one with: {_CYAN}Sandbox(record=True){_RESET}\n")
+        return 0
+
+    _print(f"\n{_BOLD}VM Snapshots:{_RESET}\n")
+    for snap in snapshots:
+        created = time.strftime("%Y-%m-%d %H:%M", time.localtime(snap.created_at))
+        vmstate_mb = os.path.getsize(snap.vmstate_path) / (1024 * 1024)
+        memory_mb = os.path.getsize(snap.memory_path) / (1024 * 1024)
+        _print(
+            f"  {_CYAN}{snap.name}{_RESET}  "
+            f"{created}  "
+            f"{snap.vcpu_count}vcpu/{snap.mem_size_mib}MB  "
+            f"vmstate={vmstate_mb:.1f}MB mem={memory_mb:.1f}MB"
+        )
+
+    _print(f"\n  {_DIM}Total: {len(snapshots)} snapshots{_RESET}\n")
+    return 0
+
+
+def cmd_snapshot_delete(args: argparse.Namespace) -> int:
+    """Delete a VM snapshot."""
+    from .snapshot import SnapshotManager
+
+    mgr = SnapshotManager()
+    if mgr.delete(args.name):
+        _print(f"{_CHECK} Deleted snapshot: {args.name}")
+        return 0
+    else:
+        _print(f"{_CROSS} Snapshot not found: {args.name}")
+        return 1
+
+
+# ── Agent Diff ──
+
+
+def cmd_diff(args: argparse.Namespace) -> int:
+    """Compare two recorded sandbox sessions side by side."""
+    try:
+        session_a = _load_session(args.session_a)
+        session_b = _load_session(args.session_b)
+    except FileNotFoundError as e:
+        _print(f"{_CROSS} {e}")
+        return 1
+
+    result = _compute_diff(session_a, session_b)
+
+    if args.format == "json":
+        print(json.dumps(result, indent=2, default=str))
+        return 0
+
+    # Text format
+    _print(f"\n{_BOLD}Agent Diff{_RESET}")
+    _print(f"  Session A: {_CYAN}{session_a.get('session_id', '?')}{_RESET} ({result['summary']['steps_a']} steps)")
+    _print(f"  Session B: {_CYAN}{session_b.get('session_id', '?')}{_RESET} ({result['summary']['steps_b']} steps)")
+    _print()
+
+    # Summary
+    s = result["summary"]
+    _print(f"  {_BOLD}Summary:{_RESET}")
+    _print(f"    Total time A: {s['total_duration_a']:.0f}ms")
+    _print(f"    Total time B: {s['total_duration_b']:.0f}ms")
+    _print(f"    Files only in A: {len(s['files_only_a'])}")
+    _print(f"    Files only in B: {len(s['files_only_b'])}")
+    _print(f"    Files in both:   {len(s['files_both'])}")
+    _print()
+
+    # Show files unique to each session
+    if s["files_only_a"]:
+        _print(f"  {_BOLD}Files only in A:{_RESET}")
+        for f in s["files_only_a"][:10]:
+            _print(f"    {_RED}{f}{_RESET}")
+    if s["files_only_b"]:
+        _print(f"  {_BOLD}Files only in B:{_RESET}")
+        for f in s["files_only_b"][:10]:
+            _print(f"    {_GREEN}{f}{_RESET}")
+
+    # Show step-by-step comparison
+    if result.get("step_comparison"):
+        _print(f"\n  {_BOLD}Step Comparison:{_RESET}\n")
+        for comp in result["step_comparison"]:
+            step = comp["step"]
+            cmd_a = comp.get("command_a", "-")
+            cmd_b = comp.get("command_b", "-")
+            if cmd_a == cmd_b:
+                _print(f"    step {step:3d}  {_DIM}[same]{_RESET}  {cmd_a[:60]}")
+            else:
+                _print(f"    step {step:3d}  {_YELLOW}[diff]{_RESET}")
+                _print(f"      A: {cmd_a[:60]}")
+                _print(f"      B: {cmd_b[:60]}")
+
+    _print()
+    return 0
+
+
+def _compute_diff(session_a: dict, session_b: dict) -> dict:
+    """Compute a structured diff between two sessions."""
+    cps_a = session_a.get("checkpoints", [])
+    cps_b = session_b.get("checkpoints", [])
+
+    # Aggregate filesystem traces
+    def aggregate_traces(checkpoints):
+        all_created = set()
+        all_modified = set()
+        all_deleted = set()
+        total_duration = 0
+        for cp in checkpoints:
+            total_duration += cp.get("duration_ms", 0)
+            trace = cp.get("trace")
+            if trace:
+                for f in trace.get("files_created", []):
+                    all_created.add(f["path"])
+                for f in trace.get("files_modified", []):
+                    all_modified.add(f["path"])
+                for f in trace.get("files_deleted", []):
+                    all_deleted.add(f["path"])
+        all_files = all_created | all_modified
+        return all_files, all_deleted, total_duration
+
+    files_a, deleted_a, duration_a = aggregate_traces(cps_a)
+    files_b, deleted_b, duration_b = aggregate_traces(cps_b)
+
+    # Step-by-step comparison
+    max_steps = max(len(cps_a), len(cps_b))
+    step_comparison = []
+    for i in range(max_steps):
+        comp = {"step": i + 1}
+        if i < len(cps_a):
+            comp["command_a"] = cps_a[i].get("command", "")
+            comp["exit_code_a"] = cps_a[i].get("exit_code", -1)
+        if i < len(cps_b):
+            comp["command_b"] = cps_b[i].get("command", "")
+            comp["exit_code_b"] = cps_b[i].get("exit_code", -1)
+        step_comparison.append(comp)
+
+    return {
+        "summary": {
+            "steps_a": len(cps_a),
+            "steps_b": len(cps_b),
+            "total_duration_a": duration_a,
+            "total_duration_b": duration_b,
+            "files_only_a": sorted(files_a - files_b),
+            "files_only_b": sorted(files_b - files_a),
+            "files_both": sorted(files_a & files_b),
+        },
+        "step_comparison": step_comparison,
+    }
+
+
 def _format_duration(seconds: float) -> str:
     """Format seconds into human-readable duration."""
     seconds = int(seconds)
@@ -960,8 +1250,10 @@ examples:
   bunkervm run -c "print(42)"          Run inline code
   bunkervm server --transport sse      Start MCP server
   bunkervm info                        Check system readiness
-  bunkervm vscode-setup                Set up VS Code MCP integration
-  bunkervm enable-network              Enable VM networking (one-time, needs sudo)
+  bunkervm replay <session-id>         Replay a recorded session
+  bunkervm replay <session> --trace    Replay with filesystem traces
+  bunkervm snapshot list               List VM snapshots
+  bunkervm diff <session-a> <session-b>  Compare two agent runs
 """,
     )
     sub = parser.add_subparsers(dest="command")
@@ -1082,6 +1374,40 @@ examples:
     sb_logs_p.add_argument("--port", type=int, default=9551, help="Engine API port")
     sb_logs_p.set_defaults(func=cmd_sandbox_logs)
 
+    # ── replay (time-travel) ──
+    replay_p = sub.add_parser("replay", help="Replay a recorded sandbox session")
+    replay_p.add_argument("session", help="Session ID or path to session JSON")
+    replay_p.add_argument(
+        "--step", type=int, help="Show details for a specific step"
+    )
+    replay_p.add_argument(
+        "--trace", action="store_true", help="Show filesystem trace for each step"
+    )
+    replay_p.set_defaults(func=cmd_replay)
+
+    # ── snapshot ──
+    snap_p = sub.add_parser("snapshot", help="Manage VM snapshots")
+    snap_sub = snap_p.add_subparsers(dest="snapshot_command")
+
+    snap_list_p = snap_sub.add_parser("list", help="List available snapshots")
+    snap_list_p.set_defaults(func=cmd_snapshot_list)
+
+    snap_delete_p = snap_sub.add_parser("delete", help="Delete a snapshot")
+    snap_delete_p.add_argument("name", help="Snapshot name")
+    snap_delete_p.set_defaults(func=cmd_snapshot_delete)
+
+    # ── diff (agent comparison) ──
+    diff_p = sub.add_parser("diff", help="Compare two agent sandbox sessions")
+    diff_p.add_argument("session_a", help="First session ID or JSON path")
+    diff_p.add_argument("session_b", help="Second session ID or JSON path")
+    diff_p.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    diff_p.set_defaults(func=cmd_diff)
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1105,6 +1431,9 @@ examples:
         return 0
     if args.command == "sandbox" and not getattr(args, "sandbox_command", None):
         sandbox_p.print_help()
+        return 0
+    if args.command == "snapshot" and not getattr(args, "snapshot_command", None):
+        snap_p.print_help()
         return 0
 
     return args.func(args)

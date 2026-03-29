@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="BunkerVM" width="140" />
+  <img src="docs/logo.svg" alt="BunkerVM" width="120" />
 </p>
 
 <h1 align="center">BunkerVM</h1>
 
 <p align="center">
-  <strong>Self-hosted AI sandbox with hardware isolation.</strong><br>
-  Your data never leaves your machine. Not a container — a real VM.
+  <strong>Time-travel debugging for AI agent sandboxes.</strong><br>
+  Hardware-isolated Firecracker microVMs with snapshot, replay, and diff — not containers.
 </p>
 
 <p align="center">
@@ -14,18 +14,101 @@
   <a href="https://github.com/ashishgituser/bunkervm/actions/workflows/ci.yml"><img src="https://github.com/ashishgituser/bunkervm/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/ashishgituser/bunkervm"><img src="https://img.shields.io/github/stars/ashishgituser/bunkervm?style=social" alt="Stars"></a>
   <img src="https://img.shields.io/badge/isolation-hardware%20(KVM)-22d3ee" alt="Isolation">
-  <img src="https://img.shields.io/badge/boot-~3s-fb923c" alt="Boot time">
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
   <a href="https://github.com/ashishgituser/bunkervm/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License"></a>
 </p>
 
-<p align="center">
-  Your AI agent can run <code>rm -rf /</code>. Let it — <strong>inside a bunker.</strong>
-</p>
+---
+
+## The problem
+
+AI agents execute code on your machine. When something goes wrong — and it will — you have no way to see **what the agent actually did**, rewind to the moment **before** it broke, or compare **why one agent succeeded and another failed**.
+
+Containers share your kernel ([escapes are real](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=docker+escape)).  
+Cloud sandboxes send your data to someone else's server.  
+Neither gives you observability into agent behaviour.
+
+**BunkerVM** solves all three: isolation, observability, and time-travel.
 
 ---
 
-## Quickstart — 3 lines
+## What it does
+
+Each sandbox is a [Firecracker](https://firecracker-microvm.github.io/) microVM — the same technology behind AWS Lambda. Own kernel, own filesystem, hardware-level (KVM) isolation. Not a container.
+
+On top of that, BunkerVM adds capabilities that no other sandbox provides:
+
+### Record every execution
+
+```python
+from bunkervm import Sandbox
+
+with Sandbox(record=True) as sb:
+    sb.run("import pandas as pd")
+    sb.run("df = pd.read_csv('/data/input.csv')")
+    sb.run("df['total'] = df.price * df.qty")
+    sb.run("df.to_csv('/output/result.csv')")
+
+# Every step recorded: command, output, filesystem changes, VM snapshot
+```
+
+### Rewind to any point
+
+```python
+sb.restore(step=2)  # VM state rewinds to after read_csv
+sb.run("df.describe()")  # explore from that exact point
+```
+
+The VM's memory, CPU registers, filesystem — everything reverts to exactly what it was after step 2. Not a re-run. An actual restore from a Firecracker snapshot.
+
+### See what changed
+
+```python
+for cp in sb.history():
+    print(f"step {cp['step']}: {cp['command']}")
+    if cp['trace']:
+        for f in cp['trace']['files_created']:
+            print(f"  + {f['path']} ({f['size']} bytes)")
+```
+
+```
+step 1: import pandas as pd
+step 2: df = pd.read_csv('/data/input.csv')
+  ~ /data/input.csv (read)
+step 3: df['total'] = df.price * df.qty
+step 4: df.to_csv('/output/result.csv')
+  + /output/result.csv (1247 bytes)
+```
+
+### Compare two agents
+
+```bash
+bunkervm diff session-abc session-def
+```
+
+```
+Agent Diff
+  Session A: abc  (12 steps, 3400ms)
+  Session B: def  (8 steps, 1200ms)
+
+  Files only in A:  /tmp/debug.log, /tmp/retry_3.py
+  Files only in B:  /output/result.csv
+
+  step  1  [same]  import pandas as pd
+  step  2  [same]  df = pd.read_csv('/data/input.csv')
+  step  3  [diff]
+    A: df = df.dropna()
+    B: df = df.fillna(0)
+  step  4  [diff]
+    A: # crashed — KeyError: 'total'
+    B: df['total'] = df.price * df.qty  ← OK
+```
+
+Agent A dropped rows and lost a required column. Agent B filled missing values and succeeded. Without diff, you'd never know why.
+
+---
+
+## Quick start
 
 ```bash
 pip install bunkervm
@@ -38,431 +121,236 @@ result = run_code("print('Hello from a microVM!')")
 print(result)  # Hello from a microVM!
 ```
 
-One function. VM boots (~3s), code runs, VM dies. **Your host was never touched.**
+VM boots, code runs, VM dies. Your host was never touched.
 
 ---
 
-## The Problem
+## How it works
 
-AI agents generate and execute code on _your_ machine. One bad LLM output and your files, credentials, or entire system could be gone. Docker shares the kernel — [container escapes are real](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=docker+escape). Cloud sandboxes send your data to someone else's server.
+```
+AI Agent
+   │
+   ▼
+bunkervm (host)  ──vsock──▶  Firecracker MicroVM
+   │                          ┌────────────────────┐
+   │  record=True             │  Alpine Linux       │
+   │  ─────────▶              │  Own kernel         │
+   │  snapshot()              │  exec_agent.py      │
+   │  trace()                 │  (filesystem trace) │
+   │  restore()               └────────────────────┘
+   │                          KVM hardware isolation
+   ▼
+~/.bunkervm/sessions/         ~/.bunkervm/snapshots/
+  session-abc.json              step1/ vmstate + memory
+  session-def.json              step2/ vmstate + memory
+```
 
-**The fix:** BunkerVM boots a [Firecracker](https://firecracker-microvm.github.io/) microVM in **~3 seconds**, runs the code inside a throwaway Linux sandbox with its own kernel, and destroys everything after. **Self-hosted. Your data stays on your machine.**
+**Firecracker** provides the isolation. BunkerVM adds the instrumentation layer:
+
+| Layer | What it does |
+|---|---|
+| **exec_agent** (inside VM) | Traces filesystem changes per command — files created, modified, deleted, bytes written |
+| **Firecracker API** (host→VM) | Pauses VM, snapshots CPU + memory state to disk, resumes — all via Firecracker's built-in snapshot API |
+| **Snapshot manager** (host) | Stores and indexes snapshots at `~/.bunkervm/snapshots/`, manages lifecycle |
+| **Session recorder** (host) | Chains commands → traces → snapshots into a replayable session JSON |
+
+No custom kernel modules. No eBPF. No ptrace. The VM is the isolation boundary; the API socket is the control plane. Pure Python, stdlib-only transport.
 
 ---
 
-## Why BunkerVM?
+## The four capabilities
 
-|  | **BunkerVM** | **E2B** | **Docker** |
-|---|---|---|---|
-| **Self-hosted** | ✅ Runs on your machine | ❌ Cloud only | ✅ Self-hosted |
-| **Data privacy** | ✅ Never leaves your network | ❌ Sent to cloud | ✅ Local |
-| **Isolation** | 🔒 Hardware (KVM) — own kernel | 🔒 Hardware (Firecracker) | ⚠️ Shared kernel |
-| **Escape risk** | Near zero | Near zero | [Container escapes exist](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=docker+escape) |
-| **Cost** | **Free forever** | Per-execution pricing | Free |
-| **Setup** | `pip install bunkervm` | API key + cloud account | Dockerfile + build + run |
-| **Boot time** | ~3s | ~1s (remote) | ~0.5s |
-| **Offline / air-gapped** | ✅ Works without internet | ❌ Requires internet | ✅ Works offline |
-| **License** | Apache-2.0 | Proprietary (client only OSS) | Apache-2.0 |
+### 1. Filesystem tracing
 
-**Choose BunkerVM when:** your data can't leave your network (finance, healthcare, defense, government), you want zero cloud costs, or you need air-gapped deployments.
+Every command execution can return a trace of what changed on disk.
+
+```python
+result = client.exec("python3 train.py", trace=True)
+print(result["trace"])
+# {
+#   "files_created": [{"path": "/output/model.pkl", "size": 4820}],
+#   "files_modified": [{"path": "/tmp/loss.log", "old_size": 0, "new_size": 312}],
+#   "files_deleted": [],
+#   "bytes_written": 5132
+# }
+```
+
+This happens inside the VM — a pre/post filesystem snapshot diff. No host-side hooks, no strace, no overhead on non-traced commands.
+
+### 2. VM snapshots
+
+Full VM state (CPU, memory, filesystem) saved to disk. Restore boots a new Firecracker process from that state instead of cold-booting.
+
+```python
+from bunkervm import Sandbox
+
+with Sandbox() as sb:
+    sb.run("import torch; model = torch.load('bert.pt')")
+    sb.checkpoint("model-loaded")       # snapshot: 45ms
+    sb.run("output = model(bad_input)") # crashes
+    sb.restore(step=1)                  # restore: <100ms
+    sb.run("output = model(good_input)")# works
+```
+
+Snapshot = Firecracker's native `PUT /snapshot/create`. Not a filesystem copy. The memory file is sparse and CoW-friendly.
+
+### 3. Session recording & replay
+
+`record=True` automatically chains traces and snapshots into a session timeline.
+
+```python
+with Sandbox(record=True) as sb:
+    sb.run("x = 42")
+    sb.run("print(x * 2)")
+    sb.run("open('/output/result.txt', 'w').write(str(x))")
+
+# Session auto-saved to ~/.bunkervm/sessions/
+```
+
+```bash
+bunkervm replay a1b2c3 --trace
+```
+
+```
+Session: a1b2c3
+  Steps: 3
+  Recorded: 2026-03-29 14:30
+
+Timeline:
+
+  📸 step   1  [ok]     12ms  python3 /tmp/_runner.py
+  📸 step   2  [ok]      8ms  python3 /tmp/_runner.py
+  📸 step   3  [ok]     15ms  python3 /tmp/_runner.py
+            + 1 files created (42 bytes)
+              + /output/result.txt (42b)
+```
+
+Each 📸 = a restorable VM snapshot. You can `restore(step=2)` and branch from there.
+
+### 4. Agent diff
+
+Run the same task with two different agents (or prompts, or models). Record both. Diff.
+
+```bash
+bunkervm diff session-gpt4 session-claude --format json
+```
+
+The diff shows: which files each agent created, which steps diverged, which agent was faster, and where failures happened. This is how you debug agent quality — not by reading logs, but by comparing filesystem-level behaviour.
 
 ---
 
-## Demo — LangGraph Multi-Agent Pipeline
+## Framework integrations
 
-3 AI agents, 3 isolated Firecracker VMs, running in parallel. Build, test, and security-scan — then nuke one VM and watch the others survive.
+Every integration auto-boots a VM and exposes 6 sandboxed tools. One base class, identical behaviour across frameworks.
 
-https://github.com/ashishgituser/bunkervm/raw/main/docs/LangGraphMultiAgentTest.mp4
-
----
-
-## Framework Integrations
-
-Every integration auto-boots a Firecracker VM and exposes **6 sandboxed tools** — `run_command`, `write_file`, `read_file`, `list_directory`, `upload_file`, `download_file`.
-
-All toolkits inherit from `BunkerVMToolsBase` — identical behaviour regardless of framework.
-
-### LangChain / LangGraph
+<details>
+<summary><strong>LangChain / LangGraph</strong></summary>
 
 ```bash
 pip install bunkervm[langgraph] langchain-openai
 ```
 
 ```python
-from langchain_openai import ChatOpenAI
-from langchain.agents import create_agent
 from bunkervm.langchain import BunkerVMToolkit
 
-with BunkerVMToolkit() as toolkit:                  # boots VM (~3s)
-    agent = create_agent(
-        ChatOpenAI(model="gpt-4o"),
-        tools=toolkit.get_tools(),                  # 6 sandbox tools
-    )
-    agent.invoke({"messages": [("user", "Find primes under 100")]})
-# VM auto-destroyed
-```
-
-<details>
-<summary>Agent execution output</summary>
-
-```
-⏳ Booting sandbox VM...  ✅ Sandbox ready
-
-→ write_file: /tmp/primes.py (312 bytes)
-→ run_command: python3 /tmp/primes.py  ← OK (42ms)
-
-🤖 [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47,
-    53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
-
-🧹 Sandbox destroyed.
+with BunkerVMToolkit() as toolkit:
+    tools = toolkit.get_tools()  # run_command, write_file, read_file, ...
+    # pass tools to your agent
 ```
 
 </details>
 
-### OpenAI Agents SDK
+<details>
+<summary><strong>OpenAI Agents SDK</strong></summary>
 
 ```bash
 pip install bunkervm[openai-agents]
 ```
 
 ```python
-from agents import Agent, Runner
 from bunkervm.openai_agents import BunkerVMTools
 
-tools = BunkerVMTools()                              # boots VM (~3s)
-agent = Agent(
-    name="coder",
-    instructions="You write and run code inside a secure VM.",
-    tools=tools.get_tools(),                         # 6 sandbox tools
-)
-result = Runner.run_sync(agent, "First 20 Fibonacci numbers")
-print(result.final_output)
+tools = BunkerVMTools()
+agent_tools = tools.get_tools()
+# ...
 tools.stop()
-```
-
-<details>
-<summary>Agent execution output</summary>
-
-```
-⏳ Booting sandbox VM...  ✅ Sandbox ready
-
-→ write_file: /tmp/fib.py (198 bytes)
-→ run_command: python3 /tmp/fib.py  ← OK (38ms)
-
-🤖 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377,
-   610, 987, 1597, 2584, 4181
-
-🧹 Sandbox destroyed.
 ```
 
 </details>
 
-### CrewAI
+<details>
+<summary><strong>CrewAI</strong></summary>
 
 ```bash
 pip install bunkervm[crewai]
 ```
 
 ```python
-from crewai import Agent, Task, Crew
 from bunkervm.crewai import BunkerVMCrewTools
 
-tools = BunkerVMCrewTools()                          # boots VM (~3s)
-coder = Agent(
-    role="Software Engineer",
-    goal="Write and test code inside a secure sandbox",
-    tools=tools.get_tools(),                         # 6 sandbox tools
-)
-task = Task(description="Bubble sort a random list", agent=coder,
-            expected_output="The sorted list")
-Crew(agents=[coder], tasks=[task]).kickoff()
+tools = BunkerVMCrewTools()
+crew_tools = tools.get_tools()
+# ...
 tools.stop()
 ```
 
-<details>
-<summary>Agent execution output</summary>
-
-```
-⏳ Booting sandbox VM...  ✅ Sandbox ready
-
-🔧 write_file → /tmp/sort.py  ✅ 403 bytes
-🔧 run_command → python3 /tmp/sort.py
-   Original: [83, 11, 25, 19, 86, 52, 97, 5, 70, 69]
-   Sorted:   [5, 11, 19, 25, 52, 69, 70, 83, 86, 97]
-
-🧹 Sandbox destroyed.
-```
-
 </details>
 
-### Install all integrations
+<details>
+<summary><strong>Claude Desktop / VS Code Copilot (MCP)</strong></summary>
 
 ```bash
-pip install bunkervm[all]    # LangChain + OpenAI Agents SDK + CrewAI
+bunkervm vscode-setup     # generates .vscode/mcp.json, works on Windows WSL2
+bunkervm server            # stdio for Claude Desktop
+bunkervm server --transport sse  # SSE for web
 ```
 
-> Full working examples: [`examples/`](examples/)
+8 MCP tools: `sandbox_exec`, `sandbox_write_file`, `sandbox_read_file`, `sandbox_list_dir`, `sandbox_upload_file`, `sandbox_download_file`, `sandbox_status`, `sandbox_reset`.
 
----
-
-## VS Code + Copilot
-
-> **Every line of code Copilot executes — hardware-isolated.**
-
-### Option A: BunkerDesktop (recommended for Windows)
-
-Just install BunkerDesktop and it works. The engine runs in the background and VS Code auto-connects.
-
-### Option B: Manual setup (2 commands)
+</details>
 
 ```bash
-pip install bunkervm
-bunkervm vscode-setup
+pip install bunkervm[all]  # all framework integrations
 ```
-
-That's it. Reload VS Code (`Ctrl+Shift+P` → "Reload Window"). Copilot Chat now has 8 sandboxed tools.
-
-> **Windows users:** These commands run in your normal PowerShell terminal.
-> `vscode-setup` auto-detects Windows, creates an isolated Python environment inside WSL,
-> installs BunkerVM there, and generates the correct config. You don't need to touch WSL directly.
-
-### How it works
-
-1. `bunkervm vscode-setup` generates `.vscode/mcp.json` — auto-detects your OS
-2. On Windows: creates `~/.bunkervm/venv` inside WSL, installs BunkerVM there automatically
-3. VS Code starts BunkerVM as an MCP server (via WSL on Windows, directly on Linux)
-4. A Firecracker microVM boots (~3s) with its own Linux kernel
-5. Copilot Chat gets 8 tools: `sandbox_exec`, `sandbox_write_file`, `sandbox_read_file`, `sandbox_list_dir`, `sandbox_upload_file`, `sandbox_download_file`, `sandbox_status`, `sandbox_reset`
-6. When Copilot writes code → it runs inside the VM → your host is never touched
-
-### Try it
-
-Open Copilot Chat and ask:
-
-- *"Write a Python script that finds primes under 1000, save it, and run it in the sandbox"*
-- *"Fetch the top 3 Hacker News posts in the sandbox"*
-- *"Run `uname -a` in the sandbox to show me the VM's kernel"*
-
-### Demo
-
-<video src="docs/BunkerVMVSCodeDemo.mp4" controls width="100%" alt="BunkerVM VS Code + Copilot demo"></video>
-
----
-
-## How It Works
-
-```
-Your AI Agent
-     │
-     ▼
-  bunkervm        ──vsock──▶   Firecracker MicroVM
-  (host)                       ┌──────────────────┐
-                               │  Alpine Linux     │
-                               │  Python 3.12      │
-                               │  Full toolchain   │
-                               │  exec_agent       │
-                               └──────────────────┘
-                               Hardware isolation (KVM)
-                               Destroyed after use
-```
-
-- **[Firecracker](https://firecracker-microvm.github.io/)** — Amazon's micro-VM engine (powers AWS Lambda & Fargate)
-- **vsock** — Zero-config host↔VM communication (no networking required)
-- **~100MB bundle** — Firecracker + kernel + rootfs, auto-downloaded on first run
-
----
-
-## BunkerDesktop — One-Click Sandbox Manager (Windows)
-
-<p align="center">
-  <img src="docs/BunkerDesktop.png" alt="BunkerDesktop — Desktop App" width="800" />
-</p>
-
-**BunkerDesktop** is the easiest way to run BunkerVM. Download the installer, double-click, done.
-
-- **Native Windows app** — no browser, no terminal, no Docker
-- **Automatic WSL2 + backend setup** — the installer handles everything
-- **Dashboard** — create, monitor, and destroy sandboxes with a click
-- **Live logs** — filter by sandbox, log level, auto-scroll
-- **Start on login** — engine runs in the background, always ready
-
-### Install
-
-1. Download **BunkerDesktopSetup.exe** from [Releases](https://github.com/ashishgituser/bunkervm/releases)
-2. Run the installer — it sets up WSL2, installs the backend, creates shortcuts
-3. Launch BunkerDesktop from your desktop
-
-> **Windows may block the installer** because it's not yet code-signed.
-> SmartScreen: Click **"More info"** → **"Run anyway"**.
-> Code signing is coming soon.
-
----
-
-## More Features
-
-<details>
-<summary><strong>Reusable Sandbox</strong> — Keep the VM alive for multiple runs</summary>
-
-```python
-from bunkervm import Sandbox
-
-with Sandbox() as sb:
-    sb.run("x = 42")
-    sb.run("y = x * 2")
-    result = sb.run("print(f'{x} * 2 = {y}')")
-    print(result)  # 42 * 2 = 84
-```
-
-State persists between `run()` calls — variables, imports, everything stays.
-
-</details>
-
-<details>
-<summary><strong>Multi-VM Support</strong> — Run multiple sandboxes simultaneously</summary>
-
-```python
-from bunkervm import VMPool
-
-pool = VMPool(max_vms=5)
-pool.start("agent-1", cpus=2, memory=1024)
-pool.start("agent-2", cpus=1, memory=512)
-
-pool.client("agent-1").exec("echo 'I am agent 1'")
-pool.client("agent-2").exec("echo 'I am agent 2'")
-pool.stop_all()
-```
-
-</details>
-
-<details>
-<summary><strong>Claude Desktop (MCP)</strong></summary>
-
-Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "bunkervm": {
-      "command": "bunkervm",
-      "args": ["server"]
-    }
-  }
-}
-```
-
-Windows (WSL2):
-```json
-{
-  "mcpServers": {
-    "bunkervm": {
-      "command": "wsl",
-      "args": ["-d", "Ubuntu", "--", "bunkervm", "server"]
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>Web Dashboard</strong></summary>
-
-```bash
-bunkervm server --transport sse --dashboard
-# Dashboard at http://localhost:3001/dashboard
-```
-
-Real-time monitoring: VM status, CPU, memory, live audit log, and reset controls.
-
-</details>
-
-<details>
-<summary><strong>MCP Tools</strong> — 8 tools exposed via MCP server</summary>
-
-| Tool | Description |
-|---|---|
-| `sandbox_exec` | Run any shell command |
-| `sandbox_write_file` | Create or edit files |
-| `sandbox_read_file` | Read files |
-| `sandbox_list_dir` | Browse directories |
-| `sandbox_upload_file` | Upload files host → VM |
-| `sandbox_download_file` | Download files VM → host |
-| `sandbox_status` | Check VM health, CPU, RAM |
-| `sandbox_reset` | Wipe sandbox, start fresh |
-
-</details>
-
-<details>
-<summary><strong>CLI Reference</strong></summary>
-
-```
-bunkervm demo                        # See it in action
-bunkervm run script.py               # Run a script in a sandbox
-bunkervm run -c "print(42)"          # Run inline code
-bunkervm server --transport sse      # Start MCP server
-bunkervm info                        # Check system readiness
-bunkervm vscode-setup                # Set up VS Code MCP integration
-bunkervm enable-network              # One-time: enable VM networking (needs sudo)
-
-Options:
-  --cpus N          vCPUs (default: 1 for run, 2 for server)
-  --memory MB       RAM in MB (default: 512 for run, 2048 for server)
-  --no-network      Disable internet inside VM
-  --timeout SECS    Execution timeout (default: 30)
-  --dashboard       Enable web dashboard (server mode)
-```
-
-</details>
 
 ---
 
 ## Install
 
-### Desktop Users (Windows)
-
-Download **BunkerDesktopSetup.exe** from [Releases](https://github.com/ashishgituser/bunkervm/releases) — everything is automatic.
-
-### Developers
-
 ```bash
-pip install bunkervm                  # Core
-pip install bunkervm[langgraph]       # + LangGraph/LangChain
-pip install bunkervm[openai-agents]   # + OpenAI Agents SDK
-pip install bunkervm[crewai]          # + CrewAI
-pip install bunkervm[all]             # Everything
+pip install bunkervm
 ```
 
-**Requirements:** Linux with KVM, or Windows WSL2 with nested virtualization. Python 3.10+.
+**Requirements:** Linux with `/dev/kvm`, or Windows WSL2 ([enable nested virtualization](https://learn.microsoft.com/en-us/windows/wsl/wsl-config#main-wsl-settings)). Python 3.10+.
 
-> Need `/dev/kvm` access? Run `bunkervm info` to diagnose, or `sudo usermod -aG kvm $USER` then re-login.
+The Firecracker binary + kernel + rootfs (~100MB) auto-download on first run. Or download from [Releases](https://github.com/ashishgituser/bunkervm/releases).
 
 <details>
-<summary><strong>WSL2 Setup (Windows)</strong></summary>
+<summary><strong>WSL2 setup (Windows)</strong></summary>
 
 Add to `%USERPROFILE%\.wslconfig`:
 ```ini
 [wsl2]
 nestedVirtualization=true
 ```
-Then restart WSL: `wsl --shutdown`
+Then: `wsl --shutdown`
 
 </details>
 
 <details>
 <summary><strong>Troubleshooting</strong></summary>
 
-| Problem | Solution |
+| Problem | Fix |
 |---|---|
-| `bunkervm: command not found` with sudo | `sudo $(which bunkervm) demo` or add user to kvm group |
-| `/dev/kvm not found` | `sudo modprobe kvm` or enable nested virtualization in WSL2 |
-| `Permission denied: /dev/kvm` | `sudo usermod -aG kvm $USER` then re-login |
-| Bundle download fails | Download from [Releases](https://github.com/ashishgituser/bunkervm/releases) → `~/.bunkervm/bundle/` |
-| VM fails to start | `bunkervm info` — diagnoses all prerequisites |
+| `/dev/kvm` not found | `sudo modprobe kvm` or enable nested virtualization |
+| Permission denied | `sudo usermod -aG kvm $USER` then re-login |
+| Bundle download fails | Manual download from [Releases](https://github.com/ashishgituser/bunkervm/releases) → `~/.bunkervm/bundle/` |
+| VM won't start | `bunkervm info` — diagnoses all prerequisites |
 
 </details>
 
 <details>
-<summary><strong>Building from source</strong></summary>
+<summary><strong>Build from source</strong></summary>
 
 ```bash
 git clone https://github.com/ashishgituser/bunkervm.git
@@ -470,27 +358,43 @@ cd bunkervm
 sudo bash build/setup-firecracker.sh
 sudo bash build/build-sandbox-rootfs.sh
 pip install -e ".[dev]"
-bunkervm demo
+pytest tests/
 ```
 
 </details>
 
 ---
 
+## CLI
+
+```
+bunkervm demo                              # see it in action
+bunkervm run script.py                     # run a script in a sandbox
+bunkervm run -c "print(42)"               # inline code
+bunkervm replay <session-id> --trace       # replay recorded session
+bunkervm diff <session-a> <session-b>      # compare two agent runs
+bunkervm snapshot list                     # list VM snapshots
+bunkervm snapshot delete <name>            # delete a snapshot
+bunkervm server --transport sse            # MCP server
+bunkervm info                              # system readiness check
+```
+
+---
+
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for our security model and how to report vulnerabilities.
+See [SECURITY.md](SECURITY.md).
 
 ## License
 
-Apache-2.0 — Free for personal, open-source, and commercial use.
+Apache-2.0
 
 ---
 
 <p align="center">
-  <strong>If BunkerVM helps you ship safer agents, <a href="https://github.com/ashishgituser/bunkervm">give it a star ⭐</a></strong>
+  <strong>If BunkerVM helps you build safer agents, <a href="https://github.com/ashishgituser/bunkervm">star the repo</a></strong>
 </p>

@@ -144,6 +144,80 @@ class VMManager:
             "VM started (PID %d), vsock UDS: %s", self._process.pid, self.config.vsock_uds_path
         )
 
+    def start_from_snapshot(self, snapshot_name: str) -> None:
+        """Start a VM by restoring from a previously created snapshot.
+
+        This is the fast-boot path: instead of cold-booting the kernel,
+        we start Firecracker with no boot config, then load pre-saved
+        CPU + memory state via the API socket. Typically <100ms to ready.
+
+        Args:
+            snapshot_name: Name of the snapshot to restore from.
+        """
+        from .snapshot import SnapshotManager, FirecrackerAPIClient
+
+        if self.is_running():
+            logger.warning("VM already running (PID %d)", self._process.pid)
+            return
+
+        self._validate()
+
+        mgr = SnapshotManager()
+        snap = mgr.get(snapshot_name)
+        if snap is None:
+            raise VMError(f"Snapshot '{snapshot_name}' not found or incomplete")
+
+        # Use the snapshot's rootfs copy
+        self._rootfs_copy = snap.rootfs_path
+
+        # Optional: setup TAP networking
+        if self._network:
+            self._setup_network()
+
+        # Clean up old sockets
+        for sock_path in [self._socket_path, self.config.vsock_uds_path]:
+            if os.path.exists(sock_path):
+                os.unlink(sock_path)
+
+        # Start Firecracker with NO config file (config loaded via API)
+        fc_bin = self.config.firecracker_bin
+        logger.info("Starting Firecracker for snapshot restore: %s", fc_bin)
+
+        t0 = time.monotonic()
+        try:
+            self._process = subprocess.Popen(
+                [fc_bin, "--api-sock", self._socket_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+            )
+        except FileNotFoundError:
+            raise VMError(f"Firecracker binary not found at '{fc_bin}'.")
+        except PermissionError:
+            raise VMError(f"Permission denied running '{fc_bin}'.")
+
+        # Wait for API socket to appear
+        for _ in range(50):  # 50 * 10ms = 500ms max
+            if os.path.exists(self._socket_path):
+                break
+            time.sleep(0.01)
+        else:
+            if not self.is_running():
+                raise VMError("Firecracker exited before API socket was created")
+
+        # Load snapshot via Firecracker API
+        api = FirecrackerAPIClient(self._socket_path)
+        api.load_snapshot(snap.vmstate_path, snap.memory_path)
+        api.resume_vm()
+
+        elapsed_ms = (time.monotonic() - t0) * 1000
+        logger.info(
+            "VM restored from snapshot '%s' in %.1fms (PID %d)",
+            snapshot_name,
+            elapsed_ms,
+            self._process.pid,
+        )
+
     def stop(self) -> None:
         """Stop the Firecracker VM and clean up everything."""
         if self._process is not None:
@@ -197,6 +271,38 @@ class VMManager:
     def cleanup(self) -> None:
         """Alias for stop(), registered with atexit."""
         self.stop()
+
+    # ── Snapshot support ──
+
+    @property
+    def api_socket_path(self) -> str:
+        """Firecracker API socket path (for snapshot operations)."""
+        return self._socket_path
+
+    @property
+    def rootfs_path(self) -> str:
+        """Active rootfs path (working copy if available)."""
+        return self._rootfs_copy or self.config.rootfs_path
+
+    def create_snapshot(self, name: str) -> "SnapshotInfo":
+        """Create a snapshot of the running VM.
+
+        Pauses the VM, saves state + memory + rootfs, then resumes.
+        Returns SnapshotInfo with paths to the snapshot files.
+        """
+        from .snapshot import SnapshotManager
+
+        if not self.is_running():
+            raise VMError("Cannot snapshot: VM is not running")
+
+        mgr = SnapshotManager()
+        return mgr.create(
+            name=name,
+            fc_api_socket=self._socket_path,
+            rootfs_path=self.rootfs_path,
+            vcpu_count=self.config.vcpu_count,
+            mem_size_mib=self.config.mem_size_mib,
+        )
 
     def restart(self) -> None:
         """Restart the VM with a fresh rootfs copy."""

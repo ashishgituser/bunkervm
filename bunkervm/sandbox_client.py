@@ -104,12 +104,28 @@ class SandboxClient:
         command: str,
         timeout: int = 30,
         workdir: str = "/root",
+        trace: bool = False,
     ) -> dict:
-        """Execute a shell command inside the sandbox."""
+        """Execute a shell command inside the sandbox.
+
+        Args:
+            command: Shell command to run.
+            timeout: Max execution time in seconds.
+            workdir: Working directory inside the VM.
+            trace: If True, return filesystem changes in response["trace"].
+
+        Returns:
+            Dict with exit_code, stdout, stderr, duration_ms.
+            If trace=True, also includes trace dict with files_created,
+            files_modified, files_deleted, files_read, bytes_written.
+        """
+        payload = {"command": command, "timeout": timeout, "workdir": workdir}
+        if trace:
+            payload["trace"] = True
         return self._request(
             "POST",
             "/exec",
-            {"command": command, "timeout": timeout, "workdir": workdir},
+            payload,
             timeout=timeout + 10,
         )
 
