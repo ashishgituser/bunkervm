@@ -474,6 +474,7 @@ class Sandbox:
                 self.save_session()
             except Exception as e:
                 logger.warning("Failed to auto-save session: %s", e)
+            self._record = False  # Prevent duplicate save on __del__
 
         if self._engine is not None and self._engine_sandbox_id:
             # Engine mode: destroy via engine API
