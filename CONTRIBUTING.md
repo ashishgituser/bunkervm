@@ -28,11 +28,13 @@ bunkervm demo
 ### Running Tests
 
 ```bash
-# Import tests (no VM needed)
-python tests/test_imports.py
+# Import + host-side feature tests (no VM needed) — what CI runs
+pytest tests/test_imports.py tests/test_features.py
 
-# Full smoke test (requires /dev/kvm)
-python tests/smoke_test.py
+# Tests needing real Firecracker/KVM or WSL2 (run manually, not in CI)
+python tests/test_engine.py
+python tests/test_sandbox.py
+python tests/test_m4_windows.py   # Windows/WSL2 platform detection
 
 # All tests
 pytest tests/
@@ -42,32 +44,21 @@ pytest tests/
 
 ```
 bunkervm/              # Host-side Python package
-  integrations/        # Framework adapters (LangChain, OpenAI, CrewAI)
-  engine/              # Engine daemon for BunkerDesktop
+  engine/              # Engine daemon (Windows/WSL2 bridge, REST API)
 rootfs/bunkervm/       # Guest-side code (runs inside the VM)
 build/                 # Rootfs build scripts
 tests/                 # Test suite
 docs/                  # Landing page and assets
-examples/              # Working examples for each framework
+examples/              # Working examples (quickstart, session record/replay)
+backup/                # Gitignored — code moved out of scope, see backup/README.md
 ```
 
 ## Key Conventions
 
 - **Guest code (`rootfs/bunkervm/`)** — stdlib-only Python. No pip packages. Must run on Alpine/musl.
 - **`sandbox_client.py`** — stdlib-only HTTP client. No `requests`/`httpx`.
-- **Framework integrations** — subclass `BunkerVMToolsBase` from `integrations/base.py`. Never duplicate tool logic in adapters.
 - **Print to stderr** — user-facing messages go to `sys.stderr` because stdout may be captured by MCP transport.
 - **Line length** — 100 characters. Use `black` and `ruff` for formatting.
-
-## Adding a New Framework Integration
-
-1. Create `bunkervm/<framework>.py`
-2. Subclass `BunkerVMToolsBase` from `integrations/base.py`
-3. Implement `get_tools()` wrapping the 6 base methods
-4. Add optional dependency group in `pyproject.toml`
-5. Add convenience factory in `bunkervm/__init__.py`
-
-See `langchain.py` (~20 lines of framework glue) as the reference.
 
 ## Submitting Changes
 

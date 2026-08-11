@@ -266,65 +266,9 @@ The diff shows: which files each agent created, which steps diverged, which agen
 
 ---
 
-## Framework integrations
+## Integrations
 
-Every integration auto-boots a VM and exposes 6 sandboxed tools. One base class, identical behaviour across frameworks.
-
-<details>
-<summary><strong>LangChain / LangGraph</strong></summary>
-
-```bash
-pip install bunkervm[langgraph] langchain-openai
-```
-
-```python
-from bunkervm.langchain import BunkerVMToolkit
-
-with BunkerVMToolkit() as toolkit:
-    tools = toolkit.get_tools()  # run_command, write_file, read_file, ...
-    # pass tools to your agent
-```
-
-</details>
-
-<details>
-<summary><strong>OpenAI Agents SDK</strong></summary>
-
-```bash
-pip install bunkervm[openai-agents]
-```
-
-```python
-from bunkervm.openai_agents import BunkerVMTools
-
-tools = BunkerVMTools()
-agent_tools = tools.get_tools()
-# ...
-tools.stop()
-```
-
-</details>
-
-<details>
-<summary><strong>CrewAI</strong></summary>
-
-```bash
-pip install bunkervm[crewai]
-```
-
-```python
-from bunkervm.crewai import BunkerVMCrewTools
-
-tools = BunkerVMCrewTools()
-crew_tools = tools.get_tools()
-# ...
-tools.stop()
-```
-
-</details>
-
-<details>
-<summary><strong>Claude Desktop / VS Code Copilot (MCP)</strong></summary>
+### MCP (Claude Desktop, VS Code Copilot, any MCP client)
 
 ```bash
 bunkervm vscode-setup     # generates .vscode/mcp.json, works on Windows WSL2
@@ -334,10 +278,16 @@ bunkervm server --transport sse  # SSE for web
 
 8 MCP tools: `sandbox_exec`, `sandbox_write_file`, `sandbox_read_file`, `sandbox_list_dir`, `sandbox_upload_file`, `sandbox_download_file`, `sandbox_status`, `sandbox_reset`.
 
-</details>
+### Any agent framework
 
-```bash
-pip install bunkervm[all]  # all framework integrations
+`secure_agent()` wraps a single-tool adapter around whatever you already have, no BunkerVM-specific toolkit required:
+
+```python
+from bunkervm import secure_agent
+
+runtime = secure_agent()
+tool = runtime.as_tool()          # LangChain-compatible tool (requires langchain-core)
+tool = runtime.as_openai_tool()   # OpenAI Agents SDK tool (requires openai-agents)
 ```
 
 ---

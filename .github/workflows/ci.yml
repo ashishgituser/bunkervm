@@ -34,4 +34,4 @@ jobs:
       - name: Import smoke test
         run: python tests/test_imports.py
       - name: Unit tests (no KVM required)
-        run: pytest tests/test_imports.py -v
+        run: pytest tests/test_imports.py tests/test_features.py -v

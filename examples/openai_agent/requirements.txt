@@ -1,2 +1,0 @@
-bunkervm[openai-agents]
-python-dotenv

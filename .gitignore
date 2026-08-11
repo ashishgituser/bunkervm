@@ -1,5 +1,8 @@
 # BunkerVM — Ignore List
 
+# Local backup of moved-aside / experimental code (see backup/README.md)
+backup/
+
 # Build artifacts (large binaries — download/build locally)
 build/rootfs.ext4
 build/vmlinux

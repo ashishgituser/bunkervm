@@ -34,28 +34,6 @@ dev = [
     "black>=23.0",
     "ruff>=0.1.0",
 ]
-langgraph = [
-    "langchain-openai>=0.1.0",
-    "langgraph>=0.1.0",
-    "langchain-core>=0.1.0",
-    "python-dotenv>=1.0.0",
-]
-openai-agents = [
-    "openai-agents>=0.1.0",
-    "python-dotenv>=1.0.0",
-]
-crewai = [
-    "crewai>=0.50.0",
-    "python-dotenv>=1.0.0",
-]
-all = [
-    "langchain-openai>=0.1.0",
-    "langgraph>=0.1.0",
-    "langchain-core>=0.1.0",
-    "openai-agents>=0.1.0",
-    "crewai>=0.50.0",
-    "python-dotenv>=1.0.0",
-]
 
 [project.scripts]
 bunkervm = "bunkervm.cli:main"

@@ -1,4 +1,4 @@
-"""Test all imports — core API, integrations, and convenience functions."""
+"""Test all imports — core API."""
 
 import pytest
 
@@ -13,44 +13,12 @@ def test_core_api_imports():
     assert Sandbox is Sandbox2
 
 
-def test_integrations_base_import():
-    """BunkerVMToolsBase is importable from both paths."""
-    from bunkervm.integrations.base import BunkerVMToolsBase
-    from bunkervm.integrations import BunkerVMToolsBase as B2
+def test_agent_tool_adapters():
+    """SecureAgentRuntime exposes single-tool adapters for LangChain/OpenAI Agents SDK."""
+    from bunkervm.agent_runtime import SecureAgentRuntime
 
-    assert B2 is BunkerVMToolsBase
-
-
-def test_framework_imports():
-    """Framework adapter modules import without their framework packages installed."""
-    from bunkervm.langchain import BunkerVMToolkit
-    from bunkervm.openai_agents import BunkerVMTools
-    from bunkervm.crewai import BunkerVMCrewTools
-    from bunkervm.integrations.base import BunkerVMToolsBase
-
-    assert issubclass(BunkerVMToolkit, BunkerVMToolsBase)
-    assert issubclass(BunkerVMTools, BunkerVMToolsBase)
-    assert issubclass(BunkerVMCrewTools, BunkerVMToolsBase)
-
-
-def test_shared_tool_methods():
-    """Base class exposes all 6 shared tool methods."""
-    from bunkervm.integrations.base import BunkerVMToolsBase
-
-    for m in [
-        "_run_command",
-        "_write_file",
-        "_read_file",
-        "_list_directory",
-        "_upload_file",
-        "_download_file",
-    ]:
-        assert hasattr(BunkerVMToolsBase, m), f"Missing method: {m}"
-
-
-def test_convenience_functions():
-    """Convenience factory functions are importable."""
-    from bunkervm import get_toolkit, get_openai_tools, get_crewai_tools
+    assert hasattr(SecureAgentRuntime, "as_tool")
+    assert hasattr(SecureAgentRuntime, "as_openai_tool")
 
 
 def test_version():

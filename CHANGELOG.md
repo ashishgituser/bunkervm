@@ -4,6 +4,11 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+### Removed
+- Desktop GUI app (`desktop/`) and its Windows installer — unfinished mid-pivot (PyInstaller → planned Tauri rewrite), untested, not part of the core value proposition. Moved to a local `backup/` folder (gitignored, not in version control).
+- Dedicated LangChain, OpenAI Agents SDK, and CrewAI integration modules/extras (`bunkervm.langchain`, `bunkervm.openai_agents`, `bunkervm.crewai`, and their `pip install bunkervm[...]` extras) — untested in CI, high maintenance surface for three framework APIs. `SecureAgentRuntime.as_tool()` / `.as_openai_tool()` remain as lightweight single-tool adapters using the upstream SDKs directly.
+- Stale/ad-hoc dev scripts from `tests/` (`test_v030.py`, `verify_all.py`, `smoke_test.py`, `test_escape.py`) that were hardcoded to old versions/paths and not real regression tests.
+
 ### Added
 - CI workflow with lint + import tests across Python 3.10-3.13
 - Resource limits in guest exec agent (ulimit memory/processes, write-file size cap)

@@ -1,3 +1,0 @@
-bunkervm[langgraph]
-langchain-openai
-python-dotenv

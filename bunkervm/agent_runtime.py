@@ -159,15 +159,6 @@ class SecureAgentRuntime:
     def as_tool(self, name: str = "execute_code") -> Any:
         """Create a LangChain-compatible tool that runs code in this sandbox.
 
-        For a full set of tools (run_command, write_file, read_file, etc.),
-        use ``BunkerVMToolkit`` instead::
-
-            from bunkervm.langchain import BunkerVMToolkit
-            toolkit = BunkerVMToolkit()
-            tools = toolkit.get_tools()
-
-        This method creates a single "execute_code" tool for simple cases.
-
         Usage:
             runtime = SecureAgentRuntime()
             tool = runtime.as_tool()
@@ -177,8 +168,7 @@ class SecureAgentRuntime:
             from langchain_core.tools import tool as lc_tool
         except ImportError:
             raise ImportError(
-                "langchain-core is required for as_tool(). "
-                "Install: pip install bunkervm[langgraph]"
+                "langchain-core is required for as_tool(). " "Install: pip install langchain-core"
             )
 
         runtime = self
@@ -205,15 +195,6 @@ class SecureAgentRuntime:
     def as_openai_tool(self, name: str = "execute_code") -> Any:
         """Create an OpenAI Agents SDK tool.
 
-        For a full set of tools (run_command, write_file, read_file, etc.),
-        use ``BunkerVMTools`` instead::
-
-            from bunkervm.openai_agents import BunkerVMTools
-            tools = BunkerVMTools()
-            agent_tools = tools.get_tools()
-
-        This method creates a single "execute_code" tool for simple cases.
-
         Usage:
             runtime = SecureAgentRuntime()
             tool = runtime.as_openai_tool()
@@ -224,7 +205,7 @@ class SecureAgentRuntime:
         except ImportError:
             raise ImportError(
                 "openai-agents is required for as_openai_tool(). "
-                "Install: pip install bunkervm[openai-agents]"
+                "Install: pip install openai-agents"
             )
 
         runtime = self
