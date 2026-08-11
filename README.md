@@ -15,7 +15,7 @@
   <a href="https://github.com/ashishgituser/bunkervm"><img src="https://img.shields.io/github/stars/ashishgituser/bunkervm?style=social" alt="Stars"></a>
   <img src="https://img.shields.io/badge/isolation-hardware%20(KVM)-22d3ee" alt="Isolation">
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
-  <a href="https://github.com/ashishgituser/bunkervm/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License"></a>
+  <a href="https://github.com/ashishgituser/bunkervm/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
 </p>
 
 ---
@@ -368,7 +368,7 @@ See [SECURITY.md](SECURITY.md).
 
 ## License
 
-Apache-2.0
+MIT
 
 ---
 

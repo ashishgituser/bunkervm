@@ -7,7 +7,7 @@ name = "bunkervm"
 version = "0.9.4"
 description = "Hardware-isolated Linux sandbox for AI agents — Firecracker MicroVM + MCP"
 readme = "README.md"
-license = "Apache-2.0"
+license = "MIT"
 requires-python = ">=3.10"
 authors = [{name = "Ashish"}]
 

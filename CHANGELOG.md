@@ -4,6 +4,9 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+### Changed
+- License changed from Apache-2.0 to MIT.
+
 ### Removed
 - Desktop GUI app (`desktop/`) and its Windows installer — unfinished mid-pivot (PyInstaller → planned Tauri rewrite), untested, not part of the core value proposition. Moved to a local `backup/` folder (gitignored, not in version control).
 - Dedicated LangChain, OpenAI Agents SDK, and CrewAI integration modules/extras (`bunkervm.langchain`, `bunkervm.openai_agents`, `bunkervm.crewai`, and their `pip install bunkervm[...]` extras) — untested in CI, high maintenance surface for three framework APIs. `SecureAgentRuntime.as_tool()` / `.as_openai_tool()` remain as lightweight single-tool adapters using the upstream SDKs directly.
