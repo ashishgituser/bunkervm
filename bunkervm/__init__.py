@@ -30,7 +30,7 @@ CLI:
     bunkervm server --transport sse  # Start MCP server
 """
 
-__version__ = "0.9.4"
+__version__ = "0.10.0"
 
 # ── Core API (always available) ──
 from bunkervm.sandbox_client import SandboxClient  # noqa: F401

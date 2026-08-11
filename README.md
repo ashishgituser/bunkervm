@@ -266,6 +266,23 @@ The diff shows: which files each agent created, which steps diverged, which agen
 
 ---
 
+## Why not E2B / Daytona / Modal?
+
+Those are hosted sandbox platforms — good at giving your agent a place to run. BunkerVM is a local, self-hosted debugger for whatever sandbox your agent already runs in. As of writing, none of the major hosted sandboxes ship automatic action recording, mid-session VM snapshot/restore, and cross-run diffing together:
+
+| | BunkerVM | E2B / Daytona / Modal |
+|---|---|---|
+| Isolation | Firecracker microVM (hardware/KVM) | Firecracker or container, depending on provider |
+| Hosting | Local, self-hosted — nothing leaves your machine | Cloud-hosted |
+| Auto-records every command | ✅ | ❌ (manual snapshot primitives at best) |
+| Mid-session restore | ✅ full VM state (memory + fs) | Fork-from-snapshot, not automatic rewind |
+| Diff two agent runs | ✅ `bunkervm diff` | ❌ |
+| Cost | Free, open source | Usage-billed |
+
+Trade-off: you run it on your own machine (needs `/dev/kvm` or WSL2), and it won't scale to thousands of concurrent sandboxes the way a hosted platform will. If you need managed multi-tenant infra, use one of those. If you need to see exactly what your agent did and rewind to before it broke, that's what this is for.
+
+---
+
 ## Integrations
 
 ### MCP (Claude Desktop, VS Code Copilot, any MCP client)

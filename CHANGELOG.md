@@ -4,6 +4,8 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-08-11
+
 ### Changed
 - License changed from Apache-2.0 to MIT.
 
