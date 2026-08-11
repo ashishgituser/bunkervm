@@ -93,6 +93,7 @@ class EngineClient:
         command: str,
         timeout: int = 30,
         workdir: str = "/root",
+        trace: bool = False,
     ) -> Dict[str, Any]:
         """POST /sandboxes/{id}/exec — execute a command."""
         return self._post(
@@ -101,6 +102,7 @@ class EngineClient:
                 "command": command,
                 "timeout": timeout,
                 "workdir": workdir,
+                "trace": trace,
             },
         )
 
@@ -250,8 +252,8 @@ class EngineBackedClient:
         self._sandbox_id = sandbox_id
         self.label = f"engine:{sandbox_id}"
 
-    def exec(self, command: str, timeout: int = 30, **kwargs) -> dict:
-        return self._engine.exec(self._sandbox_id, command, timeout=timeout)
+    def exec(self, command: str, timeout: int = 30, trace: bool = False, **kwargs) -> dict:
+        return self._engine.exec(self._sandbox_id, command, timeout=timeout, trace=trace)
 
     def write_file(self, path: str, content: str) -> dict:
         return self._engine.write_file(self._sandbox_id, path, content)

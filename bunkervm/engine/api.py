@@ -237,6 +237,7 @@ class EngineAPIHandler(BaseHTTPRequestHandler):
                 command=req.command,
                 timeout=req.timeout,
                 workdir=req.workdir,
+                trace=req.trace,
             )
             exit_code = result.get("exit_code", "?")
             logger.info("[%s] exec done (exit=%s)", sb_name, exit_code)

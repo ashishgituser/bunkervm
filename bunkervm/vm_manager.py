@@ -167,8 +167,17 @@ class VMManager:
         if snap is None:
             raise VMError(f"Snapshot '{snapshot_name}' not found or incomplete")
 
-        # Use the snapshot's rootfs copy
-        self._rootfs_copy = snap.rootfs_path
+        # Firecracker's vmstate records the block device's backing-file path
+        # as it was at snapshot time (the fixed working-copy path, e.g.
+        # /tmp/bunkervm-sandbox-rootfs.ext4) — not the snapshot's own stored
+        # copy. Restore the snapshotted rootfs to that exact path so the
+        # reload can find it there.
+        work_path = self.config.rootfs_work_path
+        if work_path and work_path != snap.rootfs_path:
+            shutil.copy2(snap.rootfs_path, work_path)
+            self._rootfs_copy = work_path
+        else:
+            self._rootfs_copy = snap.rootfs_path
 
         # Optional: setup TAP networking
         if self._network:

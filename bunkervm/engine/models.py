@@ -52,6 +52,7 @@ class ExecRequest:
     command: str = ""
     timeout: int = 30
     workdir: str = "/root"
+    trace: bool = False
 
     @classmethod
     def from_dict(cls, data: dict) -> "ExecRequest":
@@ -59,6 +60,7 @@ class ExecRequest:
             command=data.get("command", ""),
             timeout=data.get("timeout", 30),
             workdir=data.get("workdir", "/root"),
+            trace=data.get("trace", False),
         )
 
 
