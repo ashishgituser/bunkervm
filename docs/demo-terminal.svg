@@ -1,0 +1,48 @@
+<svg width="900" height="560" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg">
+  <title>BunkerVM — rewind an AI sandbox to any previous step</title>
+  <defs>
+    <clipPath id="rounded">
+      <rect x="0" y="0" width="900" height="560" rx="14" ry="14"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#rounded)">
+    <rect x="0" y="0" width="900" height="560" fill="#0c0c12"/>
+    <rect x="0" y="0" width="900" height="560" fill="none" stroke="#2a2a4e" stroke-width="1"/>
+
+    <!-- title bar -->
+    <rect x="0" y="0" width="900" height="40" fill="#12121c"/>
+    <circle cx="24" cy="20" r="6" fill="#ff5f57"/>
+    <circle cx="44" cy="20" r="6" fill="#febc2e"/>
+    <circle cx="64" cy="20" r="6" fill="#28c840"/>
+    <text x="450" y="25" text-anchor="middle" font-family="Menlo, Consolas, monospace" font-size="13" fill="#6b6b80">bunkervm — rewind.py</text>
+    <line x1="0" y1="40" x2="900" y2="40" stroke="#2a2a4e" stroke-width="1"/>
+
+    <!-- terminal body -->
+    <g font-family="Menlo, Consolas, 'JetBrains Mono', monospace" font-size="16" xml:space="preserve">
+      <text x="28" y="76" fill="#34d399">$ <tspan fill="#e8e8f0">pip install bunkervm</tspan></text>
+      <text x="28" y="102" fill="#6b6b80">Successfully installed bunkervm-0.10.0</text>
+
+      <text x="28" y="140" fill="#34d399">$ <tspan fill="#e8e8f0">python3 rewind.py</tspan></text>
+
+      <text x="28" y="176" fill="#9b82fc">from <tspan fill="#e8e8f0">bunkervm </tspan>import<tspan fill="#e8e8f0"> Sandbox</tspan></text>
+
+      <text x="28" y="210" fill="#9b82fc">with <tspan fill="#e8e8f0">Sandbox(record=</tspan><tspan fill="#22d3ee">True</tspan><tspan fill="#e8e8f0">) as sb:</tspan></text>
+      <text x="52" y="238" fill="#e8e8f0">sb.run(<tspan fill="#22d3ee">"x = 1"</tspan>)</text>
+      <text x="52" y="264" fill="#e8e8f0">sb.run(<tspan fill="#22d3ee">"x = x + 10"</tspan>)</text>
+      <text x="52" y="290" fill="#e8e8f0">sb.run(<tspan fill="#22d3ee">"x = x * 100"</tspan>)</text>
+      <text x="52" y="316" fill="#e8e8f0">print(sb.run(<tspan fill="#22d3ee">"print(x)"</tspan>))</text>
+      <text x="52" y="342" fill="#34d399" font-weight="bold">1100</text>
+
+      <text x="52" y="378" fill="#e8e8f0">sb.restore(<tspan fill="#22d3ee">2</tspan>)  <tspan fill="#6b6b80"># rewind to step 2</tspan></text>
+      <text x="52" y="404" fill="#e8e8f0">print(sb.run(<tspan fill="#22d3ee">"print(x)"</tspan>))</text>
+      <text x="52" y="430" fill="#34d399" font-weight="bold">11</text>
+
+      <text x="28" y="466" fill="#6b6b80">Restored in &lt;100ms — real VM memory + filesystem, not a re-run.</text>
+    </g>
+
+    <!-- footer accent -->
+    <rect x="0" y="530" width="900" height="30" fill="#12121c"/>
+    <text x="450" y="550" text-anchor="middle" font-family="Menlo, Consolas, monospace" font-size="12" fill="#7c5cfc">Firecracker microVM · hardware isolation · pip install bunkervm</text>
+  </g>
+</svg>

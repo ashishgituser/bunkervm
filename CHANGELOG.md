@@ -4,6 +4,18 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- `restore()` in direct mode raised on every call — the snapshot's frozen rootfs was never restored to the fixed working path Firecracker recorded as the block device backing file. Found and verified by actually running the demo, not just reading the README.
+- Filesystem tracing was silently dropped across the entire engine-mode call chain (the only mode on Windows), returning `trace: null` with no error.
+
+### Changed
+- README: added a real (not staged) terminal visual up top, an "Is this for you?" section, and cut ~80 lines of duplicated walkthrough between "What it does" and the old "Four capabilities" section. Fixed example session IDs that implied custom naming when IDs are actually auto-generated hex.
+- GitHub repo metadata: description, topics, and homepage were all empty/placeholder; set them and enabled GitHub Pages (the docs/ landing page was live in the repo but never actually served).
+- CI: pinned `ruff==0.15.1` and pointed the lint job at the same `pip install -e .[dev]` the test job already uses, instead of an unpinned `pip install ruff black` that silently drifted to a much newer ruff with a different default rule set.
+
+### Removed
+- `demo.tape` / `record_demo.sh` — referenced the removed `bunkervm[langgraph]` extra and a backed-up example script. Replaced by a static `docs/demo-terminal.svg` embedded in the README, showing real verified output.
+
 ## [0.10.0] — 2026-08-11
 
 ### Changed

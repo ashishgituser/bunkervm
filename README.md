@@ -18,7 +18,19 @@
   <a href="https://github.com/ashishgituser/bunkervm/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
 </p>
 
+<p align="center">
+  <img src="docs/demo-terminal.svg" alt="Sandbox variable x goes from 1100 to 11 after sb.restore(2) — a real VM rewind, not a re-run" width="720" />
+</p>
+
+That's a real run: three commands mutate `x` to `1100`, one line rewinds the sandbox to step 2, and `x` is `11` again — actual VM memory restored, not the script re-executed. That's what this repo does.
+
 ---
+
+## Is this for you?
+
+If you're building with LangChain, LangGraph, the OpenAI Agents SDK, or an MCP client like Claude Desktop or VS Code Copilot, and you've ever asked "wait, what did the agent actually do right before it broke?" — yes. BunkerVM gives every sandboxed run a rewind button and a diff tool, on your own machine, for free.
+
+If you need managed infrastructure for thousands of concurrent sandboxes, this isn't that — see [Why not E2B / Daytona / Modal?](#why-not-e2b--daytona--modal) below.
 
 ## The problem
 
@@ -82,14 +94,16 @@ step 4: df.to_csv('/output/result.csv')
 
 ### Compare two agents
 
+Every recorded session gets an auto-generated ID (printed when the sandbox exits, or via `sb.session_id`). Run the same task through two agents, then:
+
 ```bash
-bunkervm diff session-abc session-def
+bunkervm diff d0c13cb74d85 f29a61bb02e7
 ```
 
 ```
 Agent Diff
-  Session A: abc  (12 steps, 3400ms)
-  Session B: def  (8 steps, 1200ms)
+  Session A: d0c13cb74d85  (12 steps, 3400ms)
+  Session B: f29a61bb02e7  (8 steps, 1200ms)
 
   Files only in A:  /tmp/debug.log, /tmp/retry_3.py
   Files only in B:  /output/result.csv
@@ -141,8 +155,8 @@ bunkervm (host)  ──vsock──▶  Firecracker MicroVM
    │                          KVM hardware isolation
    ▼
 ~/.bunkervm/sessions/         ~/.bunkervm/snapshots/
-  session-abc.json              step1/ vmstate + memory
-  session-def.json              step2/ vmstate + memory
+  d0c13cb74d85.json             d0c13cb74d85-step1/ vmstate + memory
+                                 d0c13cb74d85-step2/ vmstate + memory
 ```
 
 **Firecracker** provides the isolation. BunkerVM adds the instrumentation layer:
@@ -158,81 +172,20 @@ No custom kernel modules. No eBPF. No ptrace. The VM is the isolation boundary; 
 
 ---
 
-## The four capabilities
+## Named checkpoints & replaying a session
 
-### 1. Filesystem tracing
-
-Every command execution can return a trace of what changed on disk.
+`restore(step=N)` rewinds to an auto-recorded step. For a checkpoint you want to name and return to deliberately — e.g. right after a slow setup step — use `checkpoint()`:
 
 ```python
-result = client.exec("python3 train.py", trace=True)
-print(result["trace"])
-# {
-#   "files_created": [{"path": "/output/model.pkl", "size": 4820}],
-#   "files_modified": [{"path": "/tmp/loss.log", "old_size": 0, "new_size": 312}],
-#   "files_deleted": [],
-#   "bytes_written": 5132
-# }
-```
-
-This happens inside the VM — a pre/post filesystem snapshot diff. No host-side hooks, no strace, no overhead on non-traced commands.
-
-### 2. VM snapshots
-
-Full VM state (CPU, memory, filesystem) saved to disk. Restore boots a new Firecracker process from that state instead of cold-booting.
-
-```python
-from bunkervm import Sandbox
-
 with Sandbox() as sb:
     sb.run("import torch; model = torch.load('bert.pt')")
-    sb.checkpoint("model-loaded")       # snapshot: 45ms
-    sb.run("output = model(bad_input)") # crashes
-    sb.restore(step=1)                  # restore: <100ms
-    sb.run("output = model(good_input)")# works
+    sb.checkpoint("model-loaded")        # snapshot: 45ms
+    sb.run("output = model(bad_input)")  # crashes
+    sb.restore(step=1)                   # restore: <100ms
+    sb.run("output = model(good_input)") # works
 ```
 
-Snapshot = Firecracker's native `PUT /snapshot/create`. Not a filesystem copy. The memory file is sparse and CoW-friendly.
-
-### 3. Session recording & replay
-
-`record=True` automatically chains traces and snapshots into a session timeline.
-
-```python
-# test_replay.py
-from bunkervm import Sandbox
-
-with Sandbox(record=True) as sb:
-    sb.run("x = 42")
-    print("Result:", sb.run("print(x * 2)"))
-
-    # Create directory first, then write file
-    sb.run("import os; os.makedirs('/tmp/output', exist_ok=True)")
-    sb.run("open('/tmp/output/result.txt', 'w').write(str(x))")
-    print("File content:", sb.run("print(open('/tmp/output/result.txt').read())"))
-
-    print("\nHistory:")
-    for step in sb.history():
-        print(f"  Step {step['step']}: {step['command'][:60]}")
-```
-
-```
-$ python test_replay.py
-Starting sandbox via BunkerVM engine...
-Sandbox ready (via engine).
-Result: 84
-File content: 42
-
-History:
-  Step 1: x = 42
-  Step 2: print(x * 2)
-  Step 3: import os; os.makedirs('/tmp/output', exist_ok=True)
-  Step 4: open('/tmp/output/result.txt', 'w').write(str(x))
-  Step 5: print(open('/tmp/output/result.txt').read())
-Session saved to ~/.bunkervm/sessions/d0c13cb74d85.json
-Destroying sandbox...
-Done.
-```
+Every `record=True` session is saved to `~/.bunkervm/sessions/<id>.json` on exit and can be replayed from the CLI, independent of the process that created it:
 
 ```bash
 bunkervm replay d0c13cb74d85 --trace
@@ -243,26 +196,12 @@ Session: d0c13cb74d85
   Steps: 5
   Recorded: 2026-03-29 23:15
 
-Timeline:
-
      step   1  [ok]      34ms  x = 42
      step   2  [ok]      23ms  print(x * 2)
      step   3  [ok]      22ms  import os; os.makedirs('/tmp/output', exist_ok=True)
      step   4  [ok]      21ms  open('/tmp/output/result.txt', 'w').write(str(x))
      step   5  [ok]      21ms  print(open('/tmp/output/result.txt').read())
 ```
-
-Each 📸 = a restorable VM snapshot. You can `restore(step=2)` and branch from there.
-
-### 4. Agent diff
-
-Run the same task with two different agents (or prompts, or models). Record both. Diff.
-
-```bash
-bunkervm diff session-gpt4 session-claude --format json
-```
-
-The diff shows: which files each agent created, which steps diverged, which agent was faster, and where failures happened. This is how you debug agent quality — not by reading logs, but by comparing filesystem-level behaviour.
 
 ---
 
