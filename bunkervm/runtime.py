@@ -49,6 +49,7 @@ def run_code(
     memory: int = 512,
     network: bool = True,
     quiet: bool = False,
+    backend: Optional[str] = None,
 ) -> str:
     """Run code inside a disposable BunkerVM sandbox.
 
@@ -64,6 +65,10 @@ def run_code(
         memory: Memory in MB. Default: 512.
         network: Enable internet inside the VM. Default: True.
         quiet: Suppress progress messages. Default: False.
+        backend: None for auto (engine, else Firecracker), or "local" to
+            explicitly force the no-isolation subprocess backend (for
+            machines that can't run Firecracker, e.g. macOS). Never chosen
+            automatically.
 
     Returns:
         stdout output from the code execution.
@@ -76,6 +81,11 @@ def run_code(
         >>> run_code("print('Hello from BunkerVM!')")
         'Hello from BunkerVM!'
     """
+    if backend == "local":
+        return _run_code_local(code, language=language, timeout=timeout, quiet=quiet)
+    if backend not in (None,):
+        raise ValueError(f"Unknown backend: {backend!r} (expected None or 'local')")
+
     # Try engine first (fast path — no Firecracker setup needed)
     engine = _try_engine_discovery()
     if engine is not None:
@@ -255,6 +265,20 @@ def _run_code_direct(
             _print("Done.")
 
 
+def _run_code_local(code: str, *, language: str, timeout: int, quiet: bool) -> str:
+    """Execute code using the local (no-isolation) subprocess backend.
+
+    No VM, no container — just a subprocess in a private temp directory.
+    Only reached when backend="local" is passed explicitly.
+    """
+    sb = Sandbox(timeout=timeout, quiet=quiet, backend="local")
+    sb.start()
+    try:
+        return sb.run(code, language=language)
+    finally:
+        sb.stop()
+
+
 class Sandbox:
     """A reusable BunkerVM sandbox context manager.
 
@@ -276,6 +300,11 @@ class Sandbox:
 
         # Explicitly use engine (skip auto-discovery):
         sb = Sandbox(engine_url="http://localhost:9551")
+
+        # Explicitly use the local backend — plain subprocess, NO isolation.
+        # Only for machines that can't run Firecracker (e.g. macOS). Never
+        # chosen automatically; must be requested by name.
+        sb = Sandbox(backend="local")
     """
 
     def __init__(
@@ -287,7 +316,10 @@ class Sandbox:
         quiet: bool = False,
         engine_url: Optional[str] = None,
         record: bool = False,
+        backend: Optional[str] = None,
     ):
+        if backend not in (None, "local"):
+            raise ValueError(f"Unknown backend: {backend!r} (expected None or 'local')")
         self._cpus = cpus
         self._memory = memory
         self._network = network
@@ -295,9 +327,14 @@ class Sandbox:
         self._quiet = quiet
         self._engine_url = engine_url  # explicit engine override
         self._record = record
+        self._backend = backend  # None = auto (engine -> direct); "local" = explicit, no isolation
         # Direct mode state
         self._vm: Optional[object] = None
         self._client: Optional[object] = None
+        # Local (no-isolation) backend state
+        self._local_client: Optional[object] = None
+        # Which backend actually ended up running: "direct" | "engine" | "local"
+        self._active_backend: Optional[str] = None
         # Engine mode state
         self._engine: Optional[object] = None
         self._engine_sandbox_id: Optional[str] = None
@@ -323,6 +360,10 @@ class Sandbox:
             self._checkpoints = []
             self._step_counter = 0
 
+        # Explicit local backend — never chosen automatically
+        if self._backend == "local":
+            return self._start_local()
+
         # Try engine mode first
         engine = self._resolve_engine()
         if engine is not None:
@@ -332,15 +373,24 @@ class Sandbox:
         return self._start_direct()
 
     def _install_runner(self) -> None:
-        """Install a persistent-namespace runner script inside the VM.
+        """Install a persistent-namespace runner script inside the sandbox.
 
         This script uses exec() with a pickled namespace so that
         variables defined in one run() call survive into the next.
+
+        Paths are resolved via the active client's map_path(): identity for
+        VM/engine clients (the guest's own "/tmp/..." convention), or a real
+        host path under a private directory for the local backend.
         """
+        self._runner_path = self._client.map_path("/tmp/_runner.py")
+        self._code_path = self._client.map_path("/tmp/_code.py")
+        self._bash_path = self._client.map_path("/tmp/_run.sh")
+        self._node_path = self._client.map_path("/tmp/_run.js")
+
         runner = (
             "import sys, os, pickle, io, traceback\n"
-            "NS_FILE   = '/tmp/_ns.pkl'\n"
-            "CODE_FILE = '/tmp/_code.py'\n"
+            f"NS_FILE   = {self._client.map_path('/tmp/_ns.pkl')!r}\n"
+            f"CODE_FILE = {self._code_path!r}\n"
             "\n"
             "ns = {}\n"
             "if os.path.exists(NS_FILE):\n"
@@ -382,8 +432,9 @@ class Sandbox:
             "    sys.exit(1)\n"
         )
         # self._client handles routing: SandboxClient for direct mode,
-        # EngineBackedClient for engine mode — no need to branch here.
-        self._client.write_file("/tmp/_runner.py", runner)
+        # EngineBackedClient for engine mode, LocalClient for the local
+        # backend — no need to branch here.
+        self._client.write_file(self._runner_path, runner)
 
     # ── Engine discovery and start helpers ──
 
@@ -423,6 +474,7 @@ class Sandbox:
 
         # Install the persistent namespace runner
         self._install_runner()
+        self._active_backend = "engine"
 
         if not self._quiet:
             _print("Sandbox ready (via engine).")
@@ -461,9 +513,35 @@ class Sandbox:
 
         # Install the persistent Python namespace runner
         self._install_runner()
+        self._active_backend = "direct"
 
         if not self._quiet:
             _print("Sandbox ready.")
+        return self
+
+    def _start_local(self) -> "Sandbox":
+        """Start sandbox using the local (no-isolation) subprocess backend.
+
+        Runs code as a real subprocess on the host inside a private temp
+        directory. No VM, no container. Explicitly opted into via
+        Sandbox(backend="local") — never chosen automatically, since it
+        provides none of BunkerVM's isolation guarantees.
+        """
+        from .local_backend import LocalClient
+
+        if not self._quiet:
+            _print(
+                "Starting sandbox via local backend (no isolation - plain subprocess, not a VM)."
+            )
+
+        self._local_client = LocalClient()
+        self._client = self._local_client
+        self._active_backend = "local"
+
+        self._install_runner()
+
+        if not self._quiet:
+            _print("Sandbox ready (local backend, unsandboxed).")
         return self
 
     def stop(self) -> None:
@@ -498,6 +576,15 @@ class Sandbox:
             self._client = None
             if not self._quiet:
                 _print("Done.")
+        elif self._local_client is not None:
+            # Local backend: remove the private working directory
+            if not self._quiet:
+                _print("Cleaning up local sandbox directory...")
+            self._local_client.cleanup()
+            self._local_client = None
+            self._client = None
+            if not self._quiet:
+                _print("Done.")
 
     def run(
         self,
@@ -529,15 +616,17 @@ class Sandbox:
         use_trace = self._record
 
         if language == "python":
-            # Use the persistent namespace runner
-            self._client.write_file("/tmp/_code.py", code)
-            result = self._client.exec("python3 /tmp/_runner.py", timeout=t, trace=use_trace)
+            # Use the persistent namespace runner. Paths are the ones
+            # cached by _install_runner() — identity ("/tmp/...") for
+            # VM/engine, a resolved real path for the local backend.
+            self._client.write_file(self._code_path, code)
+            result = self._client.exec(f"python3 {self._runner_path}", timeout=t, trace=use_trace)
         elif language == "bash":
-            self._client.write_file("/tmp/_run.sh", code)
-            result = self._client.exec("bash /tmp/_run.sh", timeout=t, trace=use_trace)
+            self._client.write_file(self._bash_path, code)
+            result = self._client.exec(f"bash {self._bash_path}", timeout=t, trace=use_trace)
         elif language == "node":
-            self._client.write_file("/tmp/_run.js", code)
-            result = self._client.exec("node /tmp/_run.js", timeout=t, trace=use_trace)
+            self._client.write_file(self._node_path, code)
+            result = self._client.exec(f"node {self._node_path}", timeout=t, trace=use_trace)
         else:
             raise ValueError(f"Unsupported language: {language}")
 
@@ -625,9 +714,13 @@ class Sandbox:
             "duration_ms": result.get("duration_ms", 0),
             "trace": result.get("trace"),
             "snapshot_name": None,
+            "backend": self._active_backend,
         }
 
-        # Create VM snapshot if in direct mode (engine mode can't snapshot)
+        # Create a snapshot if the active backend supports one. Direct mode
+        # gets a real Firecracker VM snapshot; the local backend gets a
+        # namespace + working-directory snapshot (no memory/process state).
+        # Engine mode can't snapshot at all — restore() falls back to replay.
         if self._vm is not None:
             try:
                 from .vm_manager import VMManager
@@ -635,6 +728,12 @@ class Sandbox:
                 if isinstance(self._vm, VMManager) and self._vm.is_running():
                     self._vm.create_snapshot(snap_name)
                     checkpoint["snapshot_name"] = snap_name
+            except Exception as e:
+                logger.warning("Auto-checkpoint snapshot failed (step %d): %s", step, e)
+        elif self._local_client is not None:
+            try:
+                self._local_client.create_snapshot(snap_name)
+                checkpoint["snapshot_name"] = snap_name
             except Exception as e:
                 logger.warning("Auto-checkpoint snapshot failed (step %d): %s", step, e)
 
@@ -652,16 +751,19 @@ class Sandbox:
         """
         if self._client is None:
             raise RuntimeError("Sandbox not started")
-        if self._vm is None:
-            raise RuntimeError("Manual checkpoints require direct mode (not engine)")
+        if self._vm is None and self._local_client is None:
+            raise RuntimeError("Manual checkpoints require direct or local mode (not engine)")
 
         self._step_counter += 1
         snap_name = name or f"{self._session_id or 'manual'}-cp{self._step_counter}"
 
-        from .vm_manager import VMManager
+        if self._vm is not None:
+            from .vm_manager import VMManager
 
-        if isinstance(self._vm, VMManager):
-            self._vm.create_snapshot(snap_name)
+            if isinstance(self._vm, VMManager):
+                self._vm.create_snapshot(snap_name)
+        else:
+            self._local_client.create_snapshot(snap_name)
 
         checkpoint = {
             "step": self._step_counter,
@@ -673,6 +775,7 @@ class Sandbox:
             "duration_ms": 0,
             "trace": None,
             "snapshot_name": snap_name,
+            "backend": self._active_backend,
         }
         self._checkpoints.append(checkpoint)
         return checkpoint
@@ -717,6 +820,11 @@ class Sandbox:
                 )
                 if not self._client.wait_for_health(timeout=15):
                     raise RuntimeError("VM restored but sandbox agent is not responding")
+        elif self._local_client is not None and cp.get("snapshot_name"):
+            # Local backend: restore the namespace + working directory.
+            # This is a state restore, not a VM restore — no memory or
+            # process state, unlike direct mode.
+            self._local_client.restore_snapshot(cp["snapshot_name"])
         else:
             # Engine/fallback mode: replay commands in fresh namespace
             if self._client is None:
@@ -782,6 +890,7 @@ class Sandbox:
             "session_id": self._session_id,
             "created_at": time.time(),
             "total_steps": self._step_counter,
+            "backend": self._active_backend,
             "checkpoints": self._checkpoints,
         }
 

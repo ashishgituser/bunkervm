@@ -556,6 +556,339 @@ class TestAgentDiff:
         assert "step_comparison" in result
 
 
+# ── Local Backend Tests (real subprocess execution, no KVM needed) ──
+
+
+class TestLocalClientPathMapping:
+    def test_map_path_virtual_to_real(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path))
+        mapped = client.map_path("/tmp/foo.txt")
+        assert mapped == os.path.join(str(tmp_path), "tmp", "foo.txt")
+
+    def test_map_path_idempotent(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path))
+        mapped_once = client.map_path("/tmp/foo.txt")
+        mapped_twice = client.map_path(mapped_once)
+        assert mapped_once == mapped_twice
+
+    def test_map_path_blocks_escape(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path))
+        with pytest.raises(ValueError):
+            client.map_path("../../etc/passwd")
+
+
+class TestLocalClientFiles:
+    def test_write_read_roundtrip(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path))
+        client.write_file("/tmp/hello.txt", "hi there")
+        result = client.read_file("/tmp/hello.txt")
+        assert result["content"] == "hi there"
+        assert result["encoding"] == "utf-8"
+
+    def test_read_missing_file(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path))
+        result = client.read_file("/tmp/nope.txt")
+        assert "error" in result
+
+    def test_upload_download_roundtrip(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        src = tmp_path / "src.bin"
+        src.write_bytes(b"\x00\x01binary-ish")
+        client = LocalClient(root=str(tmp_path / "sandbox"))
+        client.upload_file(str(src), "/data/copy.bin")
+        data = client.download_file("/data/copy.bin")
+        assert data == b"\x00\x01binary-ish"
+
+
+class TestLocalClientExec:
+    def test_exec_runs_python_script(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path))
+        client.write_file("/tmp/t.py", "print(1 + 1)")
+        result = client.exec("python3 /tmp/t.py", timeout=10)
+        assert result["exit_code"] == 0
+        assert result["stdout"].strip() == "2"
+
+    def test_exec_captures_relative_file_creation(self, tmp_path):
+        """Relative paths resolve inside the mapped workdir and get traced."""
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path))
+        client.write_file("/tmp/t.py", "open('out.txt', 'w').write('data')")
+        result = client.exec("python3 /tmp/t.py", timeout=10, workdir="/root", trace=True)
+        assert result["exit_code"] == 0
+        created_paths = [f["path"] for f in result["trace"]["files_created"]]
+        assert "/root/out.txt" in created_paths
+
+    def test_exec_trace_excludes_control_files(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path))
+        client.write_file("/tmp/_ns.pkl", "pretend-namespace-bytes")
+        client.write_file("/tmp/t.py", "open('/tmp/real_output.txt', 'w').write('x')" .replace("/tmp/", ""))
+        # Rewrite _ns.pkl during exec, same way the persistent runner does
+        client.write_file("/tmp/t.py", "import os; f=open('_ns.pkl','w'); f.write('changed'); f.close()")
+        result = client.exec("python3 /tmp/t.py", timeout=10, workdir="/tmp", trace=True)
+        assert result["exit_code"] == 0
+        touched = (
+            [f["path"] for f in result["trace"]["files_created"]]
+            + [f["path"] for f in result["trace"]["files_modified"]]
+        )
+        assert not any("_ns.pkl" in p for p in touched)
+
+    def test_exec_nonzero_exit(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path))
+        client.write_file("/tmp/t.py", "import sys; sys.exit(3)")
+        result = client.exec("python3 /tmp/t.py", timeout=10)
+        assert result["exit_code"] == 3
+
+
+class TestLocalClientSnapshot:
+    def test_snapshot_and_restore_roundtrip(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        snaps_dir = str(tmp_path / "snaps")
+        client = LocalClient(root=str(tmp_path / "sandbox"), snapshots_dir=snaps_dir)
+        client.write_file("/root/state.txt", "before")
+        client.create_snapshot("cp1")
+
+        client.write_file("/root/state.txt", "after")
+        assert client.read_file("/root/state.txt")["content"] == "after"
+
+        client.restore_snapshot("cp1")
+        assert client.read_file("/root/state.txt")["content"] == "before"
+
+    def test_restore_missing_snapshot_raises(self, tmp_path):
+        from bunkervm.local_backend import LocalClient
+
+        client = LocalClient(root=str(tmp_path / "sandbox"), snapshots_dir=str(tmp_path / "snaps"))
+        with pytest.raises(RuntimeError):
+            client.restore_snapshot("does-not-exist")
+
+
+class TestSandboxLocalBackend:
+    """Full Sandbox lifecycle on the local backend — no KVM, no engine."""
+
+    def test_rejects_unknown_backend(self):
+        from bunkervm.runtime import Sandbox
+
+        with pytest.raises(ValueError):
+            Sandbox(backend="docker")
+
+    def test_record_restore_roundtrip(self, tmp_path):
+        from bunkervm.runtime import Sandbox
+
+        sb = Sandbox(record=True, backend="local", quiet=True)
+        sb.start()
+        try:
+            sb.run("x = 1")
+            sb.run("x = x + 10")
+            sb.run("x = x * 100")
+            assert sb.run("print(x)") == "1100"
+
+            sb.restore(step=2)
+            assert sb.run("print(x)") == "11"
+
+            assert sb.history()[0]["backend"] == "local"
+            sb.save_session(str(tmp_path / "session.json"))
+            assert os.path.isfile(tmp_path / "session.json")
+        finally:
+            sb._record = False  # avoid stop()'s auto-save to the real ~/.bunkervm
+            sb.stop()
+
+    def test_manual_checkpoint(self):
+        from bunkervm.runtime import Sandbox
+
+        sb = Sandbox(record=True, backend="local", quiet=True)
+        sb.start()
+        try:
+            sb.run("y = 5")
+            cp = sb.checkpoint("named")
+            assert cp["backend"] == "local"
+            assert cp["snapshot_name"] == "named"
+        finally:
+            sb._record = False
+            sb.stop()
+
+
+# ── Compare / Report Tests ──
+
+
+class TestReportScoring:
+    def _session(self, session_id, commands, exit_codes=None, backend="local"):
+        exit_codes = exit_codes or [0] * len(commands)
+        checkpoints = [
+            {
+                "step": i,
+                "command": cmd,
+                "exit_code": code,
+                "duration_ms": i * 10,
+                "trace": None,
+                "backend": backend,
+            }
+            for i, (cmd, code) in enumerate(zip(commands, exit_codes), 1)
+        ]
+        return {"session_id": session_id, "backend": backend, "checkpoints": checkpoints}
+
+    def test_score_session_success(self):
+        from bunkervm.report import score_session
+
+        session = self._session("a", ["echo hi", "echo bye"])
+        result = score_session(session)
+        assert result["success"] is True
+        assert result["steps"] == 2
+        assert result["failed_steps"] == []
+
+    def test_score_session_failure(self):
+        from bunkervm.report import score_session
+
+        session = self._session("a", ["echo hi", "false"], exit_codes=[0, 1])
+        result = score_session(session)
+        assert result["success"] is False
+        assert result["failed_steps"] == [2]
+
+    def test_score_session_risk_classification(self):
+        from bunkervm.report import score_session
+
+        session = self._session("a", ["ls -la", "rm -rf /"])
+        result = score_session(session)
+        assert result["risk_counts"]["destructive"] == 1
+        assert result["highest_risk"] == "destructive"
+
+    def test_compare_sessions_ranks_success_first(self):
+        from bunkervm.report import compare_sessions
+
+        good = self._session("good", ["echo 1", "echo 2"])
+        bad = self._session("bad", ["echo 1", "false"], exit_codes=[0, 1])
+
+        result = compare_sessions([bad, good], labels=["bad", "good"])
+        ranked_labels = [s["label"] for s in sorted(result["sessions"], key=lambda s: s["rank"])]
+        assert ranked_labels[0] == "good"
+
+    def test_compare_sessions_detects_divergence(self):
+        from bunkervm.report import compare_sessions
+
+        a = self._session("a", ["echo 1", "echo 2", "echo 3"])
+        b = self._session("b", ["echo 1", "echo different", "echo 3"])
+
+        result = compare_sessions([a, b], labels=["a", "b"])
+        assert result["divergences"][0]["first_diverging_step"] == 2
+
+    def test_compare_sessions_requires_at_least_one(self):
+        from bunkervm.report import compare_sessions
+
+        with pytest.raises(ValueError):
+            compare_sessions([])
+
+    def test_render_html_report(self, tmp_path):
+        from bunkervm.report import compare_sessions, render_html_report
+
+        a = self._session("a", ["echo 1"])
+        b = self._session("b", ["echo 1", "echo 2"])
+        result = compare_sessions([a, b], labels=["a", "b"])
+
+        out_path = str(tmp_path / "report.html")
+        render_html_report(result, out_path)
+        assert os.path.isfile(out_path)
+        content = open(out_path, encoding="utf-8").read()
+        assert "Agent Comparison" in content
+        assert "a" in content and "b" in content
+
+
+class TestCLICompare:
+    def _write_session(self, tmp_path, session_id, commands, exit_codes=None):
+        exit_codes = exit_codes or [0] * len(commands)
+        checkpoints = [
+            {
+                "step": i,
+                "command": cmd,
+                "exit_code": code,
+                "duration_ms": 10,
+                "trace": None,
+                "backend": "local",
+            }
+            for i, (cmd, code) in enumerate(zip(commands, exit_codes), 1)
+        ]
+        session = {"session_id": session_id, "backend": "local", "total_steps": len(commands), "checkpoints": checkpoints}
+        path = tmp_path / f"{session_id}.json"
+        with open(path, "w") as f:
+            json.dump(session, f)
+        return str(path)
+
+    def test_cmd_compare_text(self, tmp_path, capsys):
+        from bunkervm.cli import cmd_compare
+
+        path_a = self._write_session(tmp_path, "a", ["echo 1"])
+        path_b = self._write_session(tmp_path, "b", ["echo 1", "echo 2"])
+
+        args = MagicMock()
+        args.sessions = [path_a, path_b]
+        args.format = "text"
+        args.html = None
+
+        ret = cmd_compare(args)
+        assert ret == 0
+
+    def test_cmd_compare_json(self, tmp_path, capsys):
+        from bunkervm.cli import cmd_compare
+
+        path_a = self._write_session(tmp_path, "a", ["echo 1"])
+        path_b = self._write_session(tmp_path, "b", ["echo 1"])
+
+        args = MagicMock()
+        args.sessions = [path_a, path_b]
+        args.format = "json"
+        args.html = None
+
+        ret = cmd_compare(args)
+        assert ret == 0
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert "sessions" in result
+        assert "divergences" in result
+
+    def test_cmd_compare_html_output(self, tmp_path):
+        from bunkervm.cli import cmd_compare
+
+        path_a = self._write_session(tmp_path, "a", ["echo 1"])
+        path_b = self._write_session(tmp_path, "b", ["echo 2"])
+        html_path = str(tmp_path / "out.html")
+
+        args = MagicMock()
+        args.sessions = [path_a, path_b]
+        args.format = "text"
+        args.html = html_path
+
+        ret = cmd_compare(args)
+        assert ret == 0
+        assert os.path.isfile(html_path)
+
+    def test_cmd_compare_missing_session(self, tmp_path):
+        from bunkervm.cli import cmd_compare
+
+        args = MagicMock()
+        args.sessions = ["nonexistent-session-id-xyz"]
+        args.format = "text"
+        args.html = None
+
+        ret = cmd_compare(args)
+        assert ret == 1
+
+
 # ── Snapshot CLI Tests ──
 
 

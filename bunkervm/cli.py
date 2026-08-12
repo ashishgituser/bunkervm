@@ -20,6 +20,7 @@ Commands:
     bunkervm snapshot list          # List VM snapshots
     bunkervm snapshot delete <name> # Delete a VM snapshot
     bunkervm diff <a> <b>           # Compare two agent sessions side-by-side
+    bunkervm compare <a> <b> <c>    # Score and rank multiple sessions
 
 Usage:
     pip install bunkervm
@@ -115,6 +116,9 @@ print("✓ VM will be destroyed after this demo")
 
 def cmd_demo(args: argparse.Namespace) -> int:
     """Run the BunkerVM demo — shows the product in 10 seconds."""
+    if getattr(args, "local", False):
+        return _cmd_demo_local()
+
     from .runtime import run_code
 
     _print()
@@ -148,6 +152,67 @@ def cmd_demo(args: argparse.Namespace) -> int:
         _print()
         return 0
 
+    except Exception as e:
+        _print(f"\n{_CROSS} Demo failed: {e}")
+        _print(f"{_DIM}No Firecracker/KVM? Try: bunkervm demo --local{_RESET}")
+        return 1
+
+
+def _cmd_demo_local() -> int:
+    """Local-backend demo: proves record/rewind, NOT isolation.
+
+    Deliberately does not reuse _DEMO_SCRIPT — that script prints the VM's
+    hostname/OS/process ID to demonstrate isolation, which would be actively
+    misleading here (it would just print the user's own real machine).
+    The local backend has no isolation to demonstrate; it demonstrates the
+    other half of the product instead: record every step, rewind to any of
+    them, on a machine that can't run Firecracker at all.
+    """
+    from .runtime import Sandbox
+
+    _print()
+    _print(f"{_BOLD}{_PURPLE}  ╔══════════════════════════════════════╗{_RESET}")
+    _print(f"{_BOLD}{_PURPLE}  ║      BunkerVM Demo (local backend)   ║{_RESET}")
+    _print(f"{_BOLD}{_PURPLE}  ║  Record + rewind — NO isolation      ║{_RESET}")
+    _print(f"{_BOLD}{_PURPLE}  ╚══════════════════════════════════════╝{_RESET}")
+    _print()
+    _print(f"{_YELLOW}This mode runs code as a plain subprocess — no VM, no isolation.{_RESET}")
+    _print(f"{_YELLOW}It exists to try record/restore/diff on machines without KVM.{_RESET}")
+    _print()
+
+    t0 = time.time()
+    try:
+        with Sandbox(record=True, backend="local", quiet=True) as sb:
+            sb.run("x = 1")
+            sb.run("x = x + 10")
+            sb.run("x = x * 100")
+            after_three = sb.run("print(x)")
+            _print(f"  {_CYAN}x = 1; x += 10; x *= 100 -> print(x){_RESET}")
+            print(after_three)
+
+            sb.restore(step=2)
+            after_restore = sb.run("print(x)")
+            _print(f"\n  {_CYAN}sb.restore(step=2); print(x){_RESET}")
+            print(after_restore)
+
+            sid = sb.session_id
+
+        elapsed = time.time() - t0
+        _print()
+        _print(f"{_CHECK} Demo completed in {elapsed:.1f}s")
+        _print(f"{_CHECK} Record + rewind worked — real subprocess, no VM required")
+        _print(f"{_CROSS} No isolation — this is NOT what you'd run untrusted agent code in")
+        _print()
+        _print(f"{_DIM}Learn more:{_RESET}")
+        _print(f"  {_ARROW} Inspect this session:  {_CYAN}bunkervm replay {sid} --trace{_RESET}")
+        _print(
+            f"  {_ARROW} Real isolation:         {_CYAN}bunkervm demo{_RESET} {_DIM}(Linux, or Windows+WSL2){_RESET}"
+        )
+        _print(
+            f'  {_ARROW} Python API:             {_CYAN}Sandbox(record=True, backend="local"){_RESET}'
+        )
+        _print()
+        return 0
     except Exception as e:
         _print(f"\n{_CROSS} Demo failed: {e}")
         return 1
@@ -193,11 +258,14 @@ def cmd_run(args: argparse.Namespace) -> int:
             memory=args.memory,
             network=not args.no_network,
             quiet=args.quiet,
+            backend="local" if getattr(args, "local", False) else None,
         )
         print(output)
         return 0
     except RuntimeError as e:
         _print(f"\n{_CROSS} {e}")
+        if not getattr(args, "local", False):
+            _print(f"{_DIM}No Firecracker/KVM? Try: bunkervm run --local ...{_RESET}")
         return 1
     except KeyboardInterrupt:
         _print(f"\n{_YELLOW}Interrupted{_RESET}")
@@ -242,6 +310,11 @@ def cmd_info(args: argparse.Namespace) -> int:
             _print("              WSL2: Add nestedVirtualization=true to .wslconfig")
     else:
         _print(f"  Linux:      {_YELLOW}! Not on Linux (use WSL2 on Windows){_RESET}")
+
+    # Local backend (always available — no isolation, subprocess only)
+    _print()
+    _print(f"  Local backend:  {_CHECK} available (no isolation, subprocess only)")
+    _print(f"                  {_DIM}bunkervm demo --local{_RESET}")
 
     # Bundle
     _print()
@@ -1229,6 +1302,63 @@ def _compute_diff(session_a: dict, session_b: dict) -> dict:
     }
 
 
+# ── Agent Compare (quality matrix) ──
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    """Score and rank multiple recorded sessions side by side."""
+    from .report import compare_sessions, render_html_report
+
+    sessions = []
+    for ref in args.sessions:
+        try:
+            sessions.append(_load_session(ref))
+        except FileNotFoundError as e:
+            _print(f"{_CROSS} {e}")
+            return 1
+
+    result = compare_sessions(sessions)
+
+    if args.format == "json":
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        _print(f"\n{_BOLD}Agent Comparison{_RESET}  {_DIM}({len(sessions)} sessions){_RESET}\n")
+        for s in result["sessions"]:
+            marker = f"{_GREEN}#{s['rank']}{_RESET}" if s["rank"] == 1 else f"#{s['rank']}"
+            status = (
+                f"{_GREEN}completed{_RESET}"
+                if s["success"]
+                else f"{_RED}failed (step {s['failed_steps'][0] if s['failed_steps'] else '?'}){_RESET}"
+            )
+            risky = s["risk_counts"]["destructive"] + s["risk_counts"]["blocked"]
+            risk_note = f" {_RED}({risky} destructive/blocked){_RESET}" if risky else ""
+            _print(
+                f"  {marker}  {_CYAN}{s['label']}{_RESET}  [{s['backend']}]  "
+                f"{s['steps']} steps  {status}  {s['total_duration_ms']:.0f}ms{risk_note}"
+            )
+            _print(
+                f"      files: +{s['files_created']} created  ~{s['files_modified']} modified  "
+                f"-{s['files_deleted']} deleted"
+            )
+        if result["divergences"]:
+            _print(f"\n  {_BOLD}Divergence from baseline ({result['baseline']}):{_RESET}")
+            for d in result["divergences"]:
+                if d["first_diverging_step"] is None:
+                    _print(f"    {d['compared']}: identical command sequence")
+                else:
+                    _print(f"    {d['compared']}: diverged at step {d['first_diverging_step']}")
+        _print(
+            f"\n  {_DIM}Ranked by: completed without a failed step, then fewest "
+            f"destructive/blocked commands, then total time.{_RESET}\n"
+        )
+
+    if args.html:
+        render_html_report(result, args.html)
+        _print(f"{_CHECK} HTML report written to {args.html}")
+
+    return 0
+
+
 def _format_duration(seconds: float) -> str:
     """Format seconds into human-readable duration."""
     seconds = int(seconds)
@@ -1262,12 +1392,18 @@ examples:
   bunkervm replay <session> --trace    Replay with filesystem traces
   bunkervm snapshot list               List VM snapshots
   bunkervm diff <session-a> <session-b>  Compare two agent runs
+  bunkervm compare <a> <b> <c> --html report.html  Rank multiple runs
 """,
     )
     sub = parser.add_subparsers(dest="command")
 
     # ── demo ──
     demo_p = sub.add_parser("demo", help="See BunkerVM in action (10 seconds)")
+    demo_p.add_argument(
+        "--local",
+        action="store_true",
+        help="Use the local backend (no isolation, works without KVM/WSL2 — e.g. macOS)",
+    )
     demo_p.set_defaults(func=cmd_demo)
 
     # ── run ──
@@ -1287,6 +1423,11 @@ examples:
     run_p.add_argument("--memory", type=int, default=512, help="Memory in MB (default: 512)")
     run_p.add_argument("--no-network", action="store_true", help="Disable internet in VM")
     run_p.add_argument("-q", "--quiet", action="store_true", help="Suppress progress messages")
+    run_p.add_argument(
+        "--local",
+        action="store_true",
+        help="Use the local backend (no isolation, works without KVM/WSL2 — e.g. macOS)",
+    )
     run_p.set_defaults(func=cmd_run)
 
     # ── server ──
@@ -1413,6 +1554,17 @@ examples:
         help="Output format (default: text)",
     )
     diff_p.set_defaults(func=cmd_diff)
+
+    # ── compare (agent quality matrix) ──
+    compare_p = sub.add_parser(
+        "compare", help="Score and rank recorded sessions (which agent/model did best)"
+    )
+    compare_p.add_argument("sessions", nargs="+", help="Session IDs or JSON paths to compare")
+    compare_p.add_argument(
+        "--format", choices=["text", "json"], default="text", help="Output format (default: text)"
+    )
+    compare_p.add_argument("--html", metavar="PATH", help="Also write an HTML report to PATH")
+    compare_p.set_defaults(func=cmd_compare)
 
     args = parser.parse_args()
 

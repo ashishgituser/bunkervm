@@ -4,12 +4,19 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-08-12
+
+### Added
+- **Local backend** (`Sandbox(backend="local")`, `bunkervm demo --local`, `bunkervm run --local`) — runs code as a plain subprocess instead of a Firecracker VM. No isolation, but the record/rewind/diff workflow works identically, and it needs nothing beyond Python (no `/dev/kvm`, no WSL2) — the main gap this closes is macOS, which can't run Firecracker at all. Never selected automatically; must be requested explicitly, and every checkpoint records which backend produced it (`backend` field on sessions/checkpoints).
+- `bunkervm compare <a> <b> <c> [--html report.html]` — scores and ranks multiple recorded sessions using only data `record=True` already captured: exit codes, timing, the existing safety classifier's risk tier per command, and filesystem trace. No judge model, no rubric. Ranks by completed-without-failure, then fewest destructive/blocked commands, then time, and flags the first step where each run diverges from a baseline. `bunkervm/report.py` holds the scoring/rendering logic.
+
 ### Fixed
 - `restore()` in direct mode raised on every call — the snapshot's frozen rootfs was never restored to the fixed working path Firecracker recorded as the block device backing file. Found and verified by actually running the demo, not just reading the README.
 - Filesystem tracing was silently dropped across the entire engine-mode call chain (the only mode on Windows), returning `trace: null` with no error.
 
 ### Changed
-- README: added a real (not staged) terminal visual up top, an "Is this for you?" section, and cut ~80 lines of duplicated walkthrough between "What it does" and the old "Four capabilities" section. Fixed example session IDs that implied custom naming when IDs are actually auto-generated hex.
+- README repositioned around the felt debugging pain ("what did the agent actually do, and can I get back to before it broke") instead of leading with the security pitch; isolation is now presented as the mechanism, not the headline. Added the tier table, a real (not staged) terminal visual up top, an "Is this for you?" section, and cut ~80 lines of duplicated walkthrough between "What it does" and the old "Four capabilities" section. Fixed example session IDs that implied custom naming when IDs are actually auto-generated hex.
+- `docs/index.html` (GitHub Pages landing page) updated to match: hero copy mentions the local backend/macOS path, a new "Two ways to run it" section mirrors the README's tier table, and the Time-Travel section's tool grid gained a fourth card for `bunkervm compare`.
 - GitHub repo metadata: description, topics, and homepage were all empty/placeholder; set them and enabled GitHub Pages (the docs/ landing page was live in the repo but never actually served).
 - CI: pinned `ruff==0.15.1` and pointed the lint job at the same `pip install -e .[dev]` the test job already uses, instead of an unpinned `pip install ruff black` that silently drifted to a much newer ruff with a different default rule set.
 
@@ -167,7 +174,9 @@ All notable changes to BunkerVM are documented here.
 - Bootstrap auto-download of Firecracker bundle
 - GitHub Pages landing site
 
-[Unreleased]: https://github.com/ashishgituser/bunkervm/compare/v0.8.6...HEAD
+[Unreleased]: https://github.com/ashishgituser/bunkervm/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/ashishgituser/bunkervm/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/ashishgituser/bunkervm/compare/v0.8.6...v0.10.0
 [0.8.6]: https://github.com/ashishgituser/bunkervm/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/ashishgituser/bunkervm/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/ashishgituser/bunkervm/compare/v0.8.3...v0.8.4

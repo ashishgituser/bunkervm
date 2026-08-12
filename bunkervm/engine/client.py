@@ -252,6 +252,10 @@ class EngineBackedClient:
         self._sandbox_id = sandbox_id
         self.label = f"engine:{sandbox_id}"
 
+    def map_path(self, path: str) -> str:
+        """Identity mapping — engine guest paths are already absolute inside the VM."""
+        return path
+
     def exec(self, command: str, timeout: int = 30, trace: bool = False, **kwargs) -> dict:
         return self._engine.exec(self._sandbox_id, command, timeout=timeout, trace=trace)
 

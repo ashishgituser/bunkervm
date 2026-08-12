@@ -22,31 +22,46 @@
   <img src="docs/demo-terminal.svg" alt="Sandbox variable x goes from 1100 to 11 after sb.restore(2) — a real VM rewind, not a re-run" width="720" />
 </p>
 
-That's a real run: three commands mutate `x` to `1100`, one line rewinds the sandbox to step 2, and `x` is `11` again — actual VM memory restored, not the script re-executed. That's what this repo does.
+That's a real run: three commands mutate `x` to `1100`, one line rewinds the sandbox to step 2, and `x` is `11` again — actual state restored, not the script re-executed. That's what this repo does. **Works on macOS too** — see [Two ways to run it](#two-ways-to-run-it).
 
 ---
 
 ## Is this for you?
 
-If you're building with LangChain, LangGraph, the OpenAI Agents SDK, or an MCP client like Claude Desktop or VS Code Copilot, and you've ever asked "wait, what did the agent actually do right before it broke?" — yes. BunkerVM gives every sandboxed run a rewind button and a diff tool, on your own machine, for free.
+If you're building with LangChain, LangGraph, the OpenAI Agents SDK, or an MCP client like Claude Desktop or VS Code Copilot, and you've ever stared at an agent that did fifteen things and failed, with zero visibility into what happened or a way back to before it broke — yes. BunkerVM gives every sandboxed run a rewind button and a diff tool, on your own machine, for free.
 
 If you need managed infrastructure for thousands of concurrent sandboxes, this isn't that — see [Why not E2B / Daytona / Modal?](#why-not-e2b--daytona--modal) below.
 
 ## The problem
 
-AI agents execute code on your machine. When something goes wrong — and it will — you have no way to see **what the agent actually did**, rewind to the moment **before** it broke, or compare **why one agent succeeded and another failed**.
+AI agents execute code on your machine. When something goes wrong — and it will — you have no way to see **what the agent actually did**, rewind to the moment **before** it broke, or tell **why one agent succeeded and another failed** on the same task.
 
-Containers share your kernel ([escapes are real](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=docker+escape)).  
-Cloud sandboxes send your data to someone else's server.  
-Neither gives you observability into agent behaviour.
+Most debugging here means re-running and hoping, or reading a transcript the agent wrote about itself. BunkerVM records every step as it actually happens — commands, exit codes, filesystem changes — so you can rewind to any point and inspect real state, not a self-report.
 
-**BunkerVM** solves all three: isolation, observability, and time-travel.
+It also happens to run each sandbox in a hardware-isolated [Firecracker](https://firecracker-microvm.github.io/) microVM when your machine supports it (same tech as AWS Lambda) — because [containers share your kernel](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=docker+escape) and cloud sandboxes send your data to someone else's server. On machines that can't do that (macOS, plain Windows), a local no-isolation fallback keeps the record/rewind/diff workflow available — see below.
 
 ---
 
+## Two ways to run it
+
+| | Firecracker (`Sandbox()`) | Local (`Sandbox(backend="local")`) |
+|---|---|---|
+| Isolation | Hardware (KVM microVM) | **None** — a plain subprocess |
+| Platforms | Linux, Windows+WSL2 | Anywhere Python runs, incl. **macOS** |
+| Record / rewind / diff | ✅ full VM state | ✅ namespace + working directory |
+| Setup | `/dev/kvm` or WSL2, ~100MB bundle | Nothing — `pip install` and go |
+| Use for | Running agent-generated code you don't fully trust | Trying the workflow, debugging on a machine without KVM |
+
+The local backend is never selected automatically — you have to ask for it (`backend="local"`, `--local`), and BunkerVM tells you which one is active every time. It exists because the record/rewind/diff value doesn't require a hypervisor, only the isolation does — and a lot of development happens on machines that can't run one.
+
+```bash
+bunkervm demo --local     # works everywhere, no KVM/WSL2 needed
+bunkervm demo             # real hardware isolation (Linux, or Windows+WSL2)
+```
+
 ## What it does
 
-Each sandbox is a [Firecracker](https://firecracker-microvm.github.io/) microVM — the same technology behind AWS Lambda. Own kernel, own filesystem, hardware-level (KVM) isolation. Not a container.
+In Firecracker mode, each sandbox is a [Firecracker](https://firecracker-microvm.github.io/) microVM — the same technology behind AWS Lambda. Own kernel, own filesystem, hardware-level (KVM) isolation. Not a container. The examples below use this mode; swap in `backend="local"` and everything except true VM-level restore works the same way.
 
 On top of that, BunkerVM adds capabilities that no other sandbox provides:
 
@@ -119,6 +134,33 @@ Agent Diff
 ```
 
 Agent A dropped rows and lost a required column. Agent B filled missing values and succeeded. Without diff, you'd never know why.
+
+### Rank multiple agents
+
+`diff` is pairwise. To score and rank several runs at once — which model, which prompt, which agent actually did the job:
+
+```bash
+bunkervm compare gpt4-run claude-run llama-run --html report.html
+```
+
+```
+Agent Comparison
+
+  #1  claude-run  [direct]  6 steps  completed   1900ms
+      files: +1 created  ~0 modified  -0 deleted
+  #2  gpt4-run    [direct]  8 steps  completed   3400ms  (1 destructive/blocked)
+      files: +1 created  ~0 modified  -1 deleted
+  #3  llama-run   [direct]  4 steps  failed (step 3)  1100ms
+      files: +0 created  ~0 modified  -0 deleted
+
+  Divergence from baseline (gpt4-run):
+    claude-run: diverged at step 2
+    llama-run: diverged at step 3
+
+  Ranked by: completed without a failed step, then fewest destructive/blocked commands, then total time.
+```
+
+Every column is a fact already captured by `record=True` — exit codes, timing, the [safety classifier](bunkervm/safety.py)'s risk tier for each command that ran, and the filesystem trace. There's no LLM judge and no rubric to configure: this grades what each agent actually *did*, not a transcript it wrote about itself. `--html` renders the same data as a shareable report.
 
 ---
 
@@ -218,7 +260,7 @@ Those are hosted sandbox platforms — good at giving your agent a place to run.
 | Diff two agent runs | ✅ `bunkervm diff` | ❌ |
 | Cost | Free, open source | Usage-billed |
 
-Trade-off: you run it on your own machine (needs `/dev/kvm` or WSL2), and it won't scale to thousands of concurrent sandboxes the way a hosted platform will. If you need managed multi-tenant infra, use one of those. If you need to see exactly what your agent did and rewind to before it broke, that's what this is for.
+Trade-off: it won't scale to thousands of concurrent sandboxes the way a hosted platform will. If you need managed multi-tenant infra, use one of those. If you need to see exactly what your agent did and rewind to before it broke, that's what this is for — with real hardware isolation where your machine supports it (`/dev/kvm` or WSL2), or the same record/rewind/diff workflow with no isolation anywhere else, including macOS.
 
 ---
 
@@ -252,11 +294,13 @@ tool = runtime.as_openai_tool()   # OpenAI Agents SDK tool (requires openai-agen
 
 ```bash
 pip install bunkervm
+bunkervm demo --local     # macOS / no KVM — works immediately, no download
+bunkervm demo             # real hardware isolation — Linux, or Windows+WSL2
 ```
 
-**Requirements:** Linux with `/dev/kvm`, or Windows WSL2 ([enable nested virtualization](https://learn.microsoft.com/en-us/windows/wsl/wsl-config#main-wsl-settings)). Python 3.10+.
+**For hardware isolation:** Linux with `/dev/kvm`, or Windows WSL2 ([enable nested virtualization](https://learn.microsoft.com/en-us/windows/wsl/wsl-config#main-wsl-settings)). Python 3.10+. The Firecracker binary + kernel + rootfs (~100MB) auto-download on first run, or download from [Releases](https://github.com/ashishgituser/bunkervm/releases).
 
-The Firecracker binary + kernel + rootfs (~100MB) auto-download on first run. Or download from [Releases](https://github.com/ashishgituser/bunkervm/releases).
+**For the local backend:** nothing beyond Python 3.10+. No isolation — see [Two ways to run it](#two-ways-to-run-it).
 
 <details>
 <summary><strong>WSL2 setup (Windows)</strong></summary>
@@ -301,11 +345,14 @@ pytest tests/
 ## CLI
 
 ```
-bunkervm demo                              # see it in action
+bunkervm demo                              # see it in action (real isolation)
+bunkervm demo --local                      # see it in action (no KVM needed — macOS, etc.)
 bunkervm run script.py                     # run a script in a sandbox
 bunkervm run -c "print(42)"               # inline code
+bunkervm run script.py --local             # run without isolation, no KVM/WSL2 required
 bunkervm replay <session-id> --trace       # replay recorded session
 bunkervm diff <session-a> <session-b>      # compare two agent runs
+bunkervm compare <a> <b> <c> --html out.html  # rank multiple agent runs
 bunkervm snapshot list                     # list VM snapshots
 bunkervm snapshot delete <name>            # delete a snapshot
 bunkervm server --transport sse            # MCP server

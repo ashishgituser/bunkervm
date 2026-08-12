@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BunkerVM — Time-Travel Debugging for AI Agent Sandboxes</title>
-    <meta name="description" content="Rewind an AI agent's sandbox to any previous step. Hardware-isolated Firecracker microVMs with record, snapshot, restore, and diff.">
+    <meta name="description" content="Rewind an AI agent's sandbox to any previous step, or rank several runs side by side. Hardware-isolated Firecracker microVMs, with a no-install fallback for macOS.">
     <meta property="og:title" content="BunkerVM — Time-Travel Debugging for AI Agent Sandboxes">
-    <meta property="og:description" content="Record every command, snapshot VM state after each one, rewind to any step. Firecracker microVMs for AI agents. No cloud. No Docker. Free and open-source (MIT).">
+    <meta property="og:description" content="Record every command, rewind to any step, diff or rank agent runs. Firecracker microVMs for real isolation — or a local no-isolation backend that works on macOS. No cloud. No Docker. Free and open-source (MIT).">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://raw.githubusercontent.com/ashishgituser/bunkervm/main/docs/social-preview.svg">
     <meta property="og:url" content="https://github.com/ashishgituser/bunkervm">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="BunkerVM — Time-Travel Debugging for AI Sandboxes">
-    <meta name="twitter:description" content="Hardware-isolated Firecracker microVMs with record, snapshot, restore, and diff. Self-hosted, free, MIT.">
+    <meta name="twitter:description" content="Record, rewind, diff, and rank agent runs. Firecracker microVMs for real isolation, or a local fallback that works on macOS. Self-hosted, free, MIT.">
     <meta name="twitter:image" content="https://raw.githubusercontent.com/ashishgituser/bunkervm/main/docs/social-preview.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -839,6 +839,7 @@
             <a href="#" class="logo"><img src="logo.svg" alt="BunkerVM">BunkerVM</a>
             <div class="nav-links">
                 <a href="#timetravel" class="hide-mobile">Time-Travel</a>
+                <a href="#backends" class="hide-mobile">macOS / Local</a>
                 <a href="#architecture" class="hide-mobile">Architecture</a>
                 <a href="#tools" class="hide-mobile">Tools</a>
                 <a href="#vscode" class="hide-mobile">VS Code</a>
@@ -854,7 +855,7 @@
             <div class="reveal">
                 <div class="hero-badge">
                     <span class="dot"></span>
-                    v0.10.0 — Time-travel debugging for AI sandboxes
+                    v0.11.0 — Time-travel debugging for AI sandboxes
                 </div>
             </div>
 
@@ -863,7 +864,7 @@
             </h1>
 
             <p class="subtitle reveal reveal-delay-2">
-                Every command your agent runs is recorded, snapshotted, and restorable. Hardware-isolated Firecracker microVMs — not containers.
+                Every command your agent runs is recorded, snapshotted, and restorable. Hardware-isolated Firecracker microVMs by default — or a local backend with the same rewind/diff workflow on machines that can't run one, including macOS.
             </p>
 
             <!-- Terminal Demo -->
@@ -915,7 +916,7 @@
                 </div>
             </div>
 
-            <div class="tools-grid reveal" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="tools-grid reveal" style="grid-template-columns: repeat(4, 1fr);">
                 <div class="tool-card">
                     <div class="tool-icon">&#128203;</div>
                     <h3>Record</h3>
@@ -931,7 +932,41 @@
                     <h3>Diff</h3>
                     <p><code>bunkervm diff session-a session-b</code> &mdash; see exactly where two agent runs diverged.</p>
                 </div>
+                <div class="tool-card">
+                    <div class="tool-icon">&#128202;</div>
+                    <h3>Compare</h3>
+                    <p><code>bunkervm compare a b c</code> &mdash; rank several agent runs by outcome, risk, and time. No judge model, just what actually happened.</p>
+                </div>
             </div>
+        </div>
+    </section>
+
+    <!-- Two ways to run it -->
+    <section id="backends" style="padding-top: 0;">
+        <div class="container">
+            <div class="section-label reveal">Two ways to run it</div>
+            <h2 class="reveal">Hardware isolation where you can, everywhere else too</h2>
+            <p class="section-desc reveal">Firecracker needs KVM &mdash; Linux natively, Windows via WSL2. macOS can't run it at all. The local backend trades isolation for reach: same record/rewind/diff workflow, zero setup, anywhere Python runs.</p>
+
+            <div class="comparison reveal" style="max-width: 700px;">
+                <div class="compare-col highlight">
+                    <h3>Firecracker <span class="tag tag-vm">Sandbox()</span></h3>
+                    <div class="compare-item"><span class="icon-check">&#10003;</span> Hardware isolation (KVM microVM)</div>
+                    <div class="compare-item"><span class="icon-check">&#10003;</span> Full VM state restore</div>
+                    <div class="compare-item"><span class="icon-warn">&#9888;</span> Linux, or Windows + WSL2</div>
+                    <div class="compare-item"><span class="icon-warn">&#9888;</span> Needs /dev/kvm, ~100MB bundle</div>
+                </div>
+                <div class="compare-col">
+                    <h3>Local <span class="tag tag-container">backend="local"</span></h3>
+                    <div class="compare-item"><span class="icon-warn">&#9888;</span> No isolation &mdash; plain subprocess</div>
+                    <div class="compare-item"><span class="icon-check">&#10003;</span> Namespace + working-dir restore</div>
+                    <div class="compare-item"><span class="icon-check">&#10003;</span> Any platform, incl. macOS</div>
+                    <div class="compare-item"><span class="icon-check">&#10003;</span> pip install and go &mdash; nothing else</div>
+                </div>
+            </div>
+            <p class="reveal" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 20px;">
+                Never chosen automatically &mdash; you ask for it (<code>backend="local"</code>, <code>--local</code>), and BunkerVM tells you which one is active every time.
+            </p>
         </div>
     </section>
 
@@ -1207,15 +1242,15 @@
             <div class="limits-bar reveal">
                 <div class="limit-item">
                     <span class="limit-icon">&#9679;</span>
-                    Needs sudo
+                    Needs sudo (Firecracker mode)
                 </div>
                 <div class="limit-item">
                     <span class="limit-icon">&#9679;</span>
-                    x86_64 only
+                    x86_64 only (Firecracker mode)
                 </div>
                 <div class="limit-item">
                     <span class="limit-icon">&#9679;</span>
-                    Requires KVM / WSL2
+                    Real isolation requires KVM / WSL2 &mdash; the local backend has none
                 </div>
             </div>
         </div>

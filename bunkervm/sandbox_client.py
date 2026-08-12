@@ -99,6 +99,14 @@ class SandboxClient:
     def label(self) -> str:
         return self._label
 
+    def map_path(self, path: str) -> str:
+        """Identity mapping — VM guest paths are already absolute inside the VM.
+
+        Overridden by LocalClient, which has no guest filesystem and maps
+        these onto a private host-side sandbox directory instead.
+        """
+        return path
+
     def exec(
         self,
         command: str,
