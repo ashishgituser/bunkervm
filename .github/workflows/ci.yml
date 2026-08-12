@@ -20,11 +20,21 @@ jobs:
       - run: black --check bunkervm/
 
   test:
-    name: Test (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          # The local backend is the only thing that runs without KVM, and it's
+          # what the macOS/Windows support claim rests on — so it has to be
+          # tested on those platforms, not just assumed portable from Linux.
+          - os: macos-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.12"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -35,3 +45,7 @@ jobs:
         run: python tests/test_imports.py
       - name: Unit tests (no KVM required)
         run: pytest tests/test_imports.py tests/test_features.py -v
+      - name: Local backend end-to-end
+        # Runs the exact command the README points macOS/no-KVM users at.
+        # Unit tests can pass while the real CLI path is broken.
+        run: bunkervm demo --local
