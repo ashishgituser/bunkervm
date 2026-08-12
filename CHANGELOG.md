@@ -4,6 +4,12 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+## [0.11.1] — 2026-08-12
+
+### Added
+- `bunkervm compare --label NAME` (repeatable) — display names for sessions instead of raw hex IDs. `report.compare_sessions()` already took a `labels` argument; the CLI didn't expose it.
+- `docs/compare-example.html` — a real `bunkervm compare` run (three agents cleaning the same messy CSV, one crashes, one succeeds but trips a risk flag it isn't penalized for) hosted as a static page and linked from the README and the landing page's Compare tool card, replacing the synthetic placeholder example that was there before.
+
 ## [0.11.0] — 2026-08-12
 
 ### Added
@@ -174,7 +180,8 @@ All notable changes to BunkerVM are documented here.
 - Bootstrap auto-download of Firecracker bundle
 - GitHub Pages landing site
 
-[Unreleased]: https://github.com/ashishgituser/bunkervm/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/ashishgituser/bunkervm/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/ashishgituser/bunkervm/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/ashishgituser/bunkervm/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ashishgituser/bunkervm/compare/v0.8.6...v0.10.0
 [0.8.6]: https://github.com/ashishgituser/bunkervm/compare/v0.8.5...v0.8.6

@@ -137,30 +137,34 @@ Agent A dropped rows and lost a required column. Agent B filled missing values a
 
 ### Rank multiple agents
 
-`diff` is pairwise. To score and rank several runs at once — which model, which prompt, which agent actually did the job:
+`diff` is pairwise. To score and rank several runs at once — which model, which prompt, which agent actually did the job — this is real output, from three agents given the same messy CSV (some rows missing `qty` or `price`) and asked to clean it and summarize it:
 
 ```bash
-bunkervm compare gpt4-run claude-run llama-run --html report.html
+bunkervm compare b7c9648898f2 6602545ca368 dbb6cacf533b \
+  --label careful-agent --label thorough-agent --label reckless-agent \
+  --html report.html
 ```
 
 ```
 Agent Comparison
 
-  #1  claude-run  [direct]  6 steps  completed   1900ms
+  #1  thorough-agent  [local]  4 steps  completed  187ms  (1 system)
       files: +1 created  ~0 modified  -0 deleted
-  #2  gpt4-run    [direct]  8 steps  completed   3400ms  (1 destructive/blocked)
-      files: +1 created  ~0 modified  -1 deleted
-  #3  llama-run   [direct]  4 steps  failed (step 3)  1100ms
+  #2  careful-agent   [local]  4 steps  completed  203ms
+      files: +1 created  ~0 modified  -0 deleted
+  #3  reckless-agent  [local]  2 steps  failed (step 2)  110ms
       files: +0 created  ~0 modified  -0 deleted
 
-  Divergence from baseline (gpt4-run):
-    claude-run: diverged at step 2
-    llama-run: diverged at step 3
+  Divergence from baseline (careful-agent):
+    thorough-agent: diverged at step 2
+    reckless-agent: diverged at step 2
 
   Ranked by: completed without a failed step, then fewest destructive/blocked commands, then total time.
 ```
 
-Every column is a fact already captured by `record=True` — exit codes, timing, the [safety classifier](bunkervm/safety.py)'s risk tier for each command that ran, and the filesystem trace. There's no LLM judge and no rubric to configure: this grades what each agent actually *did*, not a transcript it wrote about itself. `--html` renders the same data as a shareable report.
+`careful-agent` dropped incomplete rows before computing. `thorough-agent` filled them with 0 instead — and defensively `os.chmod()`'d its own output file, which is why it shows `(1 system)`. `reckless-agent` didn't handle missing fields at all and crashed converting `''` to a number on step 2. Note that `thorough-agent` still ranks #1: the `chmod` call is *visible*, but ranking only penalizes `destructive`/`blocked` commands, not `system`/`write` — you see the risk and judge it yourself rather than the tool silently deciding for you.
+
+Every column is a fact already captured by `record=True` — exit codes, timing, the [safety classifier](bunkervm/safety.py)'s risk tier for each command that ran, and the filesystem trace. There's no LLM judge and no rubric to configure: this grades what each agent actually *did*, not a transcript it wrote about itself. `--html` renders the same data as a shareable report — see a [live example](https://ashishgituser.github.io/bunkervm/compare-example.html).
 
 ---
 

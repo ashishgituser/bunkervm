@@ -1317,7 +1317,14 @@ def cmd_compare(args: argparse.Namespace) -> int:
             _print(f"{_CROSS} {e}")
             return 1
 
-    result = compare_sessions(sessions)
+    labels = getattr(args, "label", None)
+    if labels and len(labels) != len(sessions):
+        _print(
+            f"{_CROSS} --label given {len(labels)} times but {len(sessions)} sessions were passed"
+        )
+        return 1
+
+    result = compare_sessions(sessions, labels=labels)
 
     if args.format == "json":
         print(json.dumps(result, indent=2, default=str))
@@ -1560,6 +1567,12 @@ examples:
         "compare", help="Score and rank recorded sessions (which agent/model did best)"
     )
     compare_p.add_argument("sessions", nargs="+", help="Session IDs or JSON paths to compare")
+    compare_p.add_argument(
+        "--label",
+        action="append",
+        metavar="NAME",
+        help="Display name for a session, in order (repeatable, must match number of sessions)",
+    )
     compare_p.add_argument(
         "--format", choices=["text", "json"], default="text", help="Output format (default: text)"
     )

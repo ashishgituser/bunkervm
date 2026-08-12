@@ -837,6 +837,7 @@ class TestCLICompare:
 
         args = MagicMock()
         args.sessions = [path_a, path_b]
+        args.label = None
         args.format = "text"
         args.html = None
 
@@ -851,6 +852,7 @@ class TestCLICompare:
 
         args = MagicMock()
         args.sessions = [path_a, path_b]
+        args.label = None
         args.format = "json"
         args.html = None
 
@@ -870,6 +872,7 @@ class TestCLICompare:
 
         args = MagicMock()
         args.sessions = [path_a, path_b]
+        args.label = None
         args.format = "text"
         args.html = html_path
 
@@ -882,6 +885,40 @@ class TestCLICompare:
 
         args = MagicMock()
         args.sessions = ["nonexistent-session-id-xyz"]
+        args.label = None
+        args.format = "text"
+        args.html = None
+
+        ret = cmd_compare(args)
+        assert ret == 1
+
+    def test_cmd_compare_with_labels(self, tmp_path, capsys):
+        from bunkervm.cli import cmd_compare
+
+        path_a = self._write_session(tmp_path, "aaa111", ["echo 1"])
+        path_b = self._write_session(tmp_path, "bbb222", ["echo 1", "echo 2"])
+
+        args = MagicMock()
+        args.sessions = [path_a, path_b]
+        args.label = ["careful-agent", "thorough-agent"]
+        args.format = "json"
+        args.html = None
+
+        ret = cmd_compare(args)
+        assert ret == 0
+        result = json.loads(capsys.readouterr().out)
+        labels = {s["label"] for s in result["sessions"]}
+        assert labels == {"careful-agent", "thorough-agent"}
+
+    def test_cmd_compare_label_count_mismatch(self, tmp_path):
+        from bunkervm.cli import cmd_compare
+
+        path_a = self._write_session(tmp_path, "aaa111", ["echo 1"])
+        path_b = self._write_session(tmp_path, "bbb222", ["echo 1"])
+
+        args = MagicMock()
+        args.sessions = [path_a, path_b]
+        args.label = ["only-one-label"]
         args.format = "text"
         args.html = None
 

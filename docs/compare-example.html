@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>bunkervm compare — real example — BunkerVM</title>
+    <meta name="description" content="Three agents attempt the same messy data-cleaning task, recorded and ranked with bunkervm compare. Real output, not a mockup.">
+    <meta property="og:title" content="bunkervm compare — real example">
+    <meta property="og:description" content="Three agents attempt the same messy data-cleaning task, recorded and ranked with bunkervm compare — real output from v0.11.0.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://raw.githubusercontent.com/ashishgituser/bunkervm/main/docs/social-preview.svg">
+    <meta property="og:url" content="https://ashishgituser.github.io/bunkervm/compare-example.html">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050508;
+            --surface: #0c0c12;
+            --surface-2: #12121c;
+            --border: #1a1a2e;
+            --text: #e8e8f0;
+            --text-muted: #6b6b80;
+            --accent: #7c5cfc;
+            --accent-light: #9b82fc;
+            --accent-dim: rgba(124, 92, 252, 0.08);
+            --green: #34d399;
+            --green-dim: rgba(52, 211, 153, 0.1);
+            --orange: #fb923c;
+            --orange-dim: rgba(251, 146, 60, 0.1);
+            --red: #f87171;
+            --red-dim: rgba(248, 113, 113, 0.1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+
+        nav {
+            border-bottom: 1px solid var(--border);
+            padding: 18px 0;
+        }
+        nav .container { display: flex; justify-content: space-between; align-items: center; }
+        .logo {
+            font-size: 1.05rem; font-weight: 800; text-decoration: none;
+            background: linear-gradient(135deg, #7c5cfc 0%, #22d3ee 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .logo img { width: 24px; height: 24px; border-radius: 5px; }
+        nav a.back { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        nav a.back:hover { color: var(--text); }
+
+        main { padding: 48px 0 80px; }
+
+        .eyebrow {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase;
+            color: var(--accent-light);
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 14px;
+        }
+        .eyebrow::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+
+        h1 {
+            font-size: clamp(1.6rem, 4vw, 2.1rem);
+            font-weight: 800; letter-spacing: -0.01em; margin-bottom: 14px;
+        }
+        .lede { color: var(--text-muted); max-width: 62ch; margin-bottom: 20px; }
+        .lede code { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; background: var(--surface-2); padding: 1px 6px; border-radius: 4px; color: var(--accent-light); }
+
+        .cmd {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+            padding: 12px 16px; color: var(--text-muted); width: fit-content; margin-bottom: 12px;
+        }
+        .cmd b { color: var(--text); font-weight: 500; }
+
+        .meta {
+            display: flex; flex-wrap: wrap; gap: 6px 18px;
+            font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-muted);
+            margin-bottom: 44px;
+        }
+        .meta b { color: var(--text); }
+
+        .section-label {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+            letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .agents { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+        .agent-card {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+            padding: 20px 22px; display: grid; grid-template-columns: 40px 1fr auto; gap: 4px 16px; align-items: center;
+        }
+        .agent-card.rank-1 { border-color: var(--green); box-shadow: 0 0 0 1px var(--green) inset, 0 0 24px var(--green-dim); }
+        .rank-num { font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; font-weight: 700; color: var(--text-muted); grid-row: 1/3; }
+        .rank-1 .rank-num { color: var(--green); }
+        .agent-name { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; }
+        .agent-sid { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); font-weight: 400; margin-left: 8px; }
+        .agent-what { grid-column: 2/3; color: var(--text-muted); font-size: 0.85rem; }
+        .agent-what code { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; color: var(--text); }
+        .agent-stats { grid-column: 3/4; grid-row: 1/3; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+        .pill { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+        .pill.ok { background: var(--green-dim); color: var(--green); }
+        .pill.fail { background: var(--red-dim); color: var(--red); }
+        .stat-line { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); }
+        .chip { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; padding: 2px 7px; border-radius: 5px; background: var(--orange-dim); color: var(--orange); }
+        .rank-note {
+            grid-column: 1/4; font-size: 0.8rem; color: var(--text-muted);
+            margin-top: 6px; padding-top: 12px; border-top: 1px dashed var(--border);
+        }
+        .rank-note b { color: var(--text); }
+
+        .method-note { color: var(--text-muted); font-size: 0.82rem; margin: 4px 0 48px; }
+
+        .trace { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 48px; }
+        .trace-row { display: grid; grid-template-columns: 96px 1fr; border-bottom: 1px solid var(--border); }
+        .trace-row:last-child { border-bottom: none; }
+        .trace-step { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); padding: 14px; background: var(--surface-2); }
+        .trace-code { overflow-x: auto; padding: 14px 18px; }
+        .trace-code pre { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; line-height: 1.8; white-space: pre; }
+        .who { color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-top: 8px; }
+        .trace-row:first-child .who:first-child { margin-top: 0; }
+        .who.fail-who { color: var(--red); }
+        .diff-add { color: var(--green); }
+        .diff-fail { color: var(--red); }
+
+        .cta {
+            display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+            padding-top: 28px; border-top: 1px solid var(--border);
+        }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; border-radius: 10px;
+            text-decoration: none; font-weight: 600; font-size: 0.88rem; transition: all 0.2s;
+        }
+        .btn-glow { background: var(--accent); color: white; }
+        .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,92,252,0.3); }
+        .btn-ghost { color: var(--text-muted); border: 1px solid var(--border); }
+        .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+
+        footer { border-top: 1px solid var(--border); padding: 28px 0; }
+        footer .container { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        footer, footer a { color: var(--text-muted); font-size: 0.82rem; text-decoration: none; }
+        footer a:hover { color: var(--text); }
+
+        @media (max-width: 560px) {
+            .agent-card { grid-template-columns: 32px 1fr; }
+            .agent-stats { grid-column: 1/3; grid-row: auto; flex-direction: row; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+            .rank-note { grid-column: 1/3; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="container">
+            <a href="index.html" class="logo"><img src="logo.svg" alt="BunkerVM">BunkerVM</a>
+            <a href="index.html#timetravel" class="back">&larr; back to overview</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="container">
+            <div class="eyebrow">bunkervm compare &middot; real output, v0.11.0</div>
+            <h1>Three agents, one messy CSV</h1>
+            <p class="lede">Same task, three sandboxed runs: clean a small sales dataset where some rows are missing <code>qty</code> or <code>price</code>, then write a summary. Each agent handled the gaps differently &mdash; recorded with <code>Sandbox(record=True, backend="local")</code>, no Firecracker needed for this run, then ranked with a single command.</p>
+
+            <div class="cmd">$ <b>bunkervm compare</b> b7c9648898f2 6602545ca368 dbb6cacf533b \<br>&nbsp;&nbsp;--label careful-agent --label thorough-agent --label reckless-agent --html report.html</div>
+            <div class="meta">
+                <span><b>3</b> sessions</span>
+                <span>backend: <b>local</b></span>
+                <span>generated <b>2026-08-12</b></span>
+            </div>
+
+            <div class="section-label">Ranked</div>
+            <div class="agents">
+
+                <div class="agent-card rank-1">
+                    <div class="rank-num">1</div>
+                    <div class="agent-name">thorough-agent <span class="agent-sid">6602545ca368</span></div>
+                    <div class="agent-stats">
+                        <span class="pill ok">completed</span>
+                        <span class="stat-line">187ms &middot; 4 steps &middot; +1 file</span>
+                        <span class="chip">system &times;1</span>
+                    </div>
+                    <div class="agent-what">Filled missing <code>qty</code>/<code>price</code> with 0 instead of dropping rows &mdash; then <code>os.chmod()</code>'d its own output file "to be safe."</div>
+                    <div class="rank-note">Fastest of the two that finished. The chmod call shows up in the risk column, but isn't held against its rank &mdash; only <b>destructive</b>/<b>blocked</b> commands affect ranking. That line is deliberate: you see the risk and judge it yourself.</div>
+                </div>
+
+                <div class="agent-card">
+                    <div class="rank-num">2</div>
+                    <div class="agent-name">careful-agent <span class="agent-sid">b7c9648898f2</span></div>
+                    <div class="agent-stats">
+                        <span class="pill ok">completed</span>
+                        <span class="stat-line">203ms &middot; 4 steps &middot; +1 file</span>
+                    </div>
+                    <div class="agent-what">Dropped every row with a missing field before computing the total &mdash; slower, but touched nothing risky.</div>
+                </div>
+
+                <div class="agent-card">
+                    <div class="rank-num">3</div>
+                    <div class="agent-name">reckless-agent <span class="agent-sid">dbb6cacf533b</span></div>
+                    <div class="agent-stats">
+                        <span class="pill fail">failed &middot; step 2</span>
+                        <span class="stat-line">110ms &middot; 2 steps &middot; +0 files</span>
+                    </div>
+                    <div class="agent-what">Never checked for missing fields. Crashed converting an empty string to a number on step 2 &mdash; recorded automatically, no summary ever written.</div>
+                </div>
+
+            </div>
+            <p class="method-note">Ranked by: completed without a failed step, then fewest destructive/blocked commands, then total time. Every field above is data <code>record=True</code> already captured &mdash; no model graded these runs.</p>
+
+            <div class="section-label">Where they diverged from the baseline (careful-agent)</div>
+            <div class="trace">
+                <div class="trace-row">
+                    <div class="trace-step">step 1<br>same</div>
+                    <div class="trace-code"><pre><span class="who">all three</span>rows = [{"item": "widget", "qty": "10", ...}, {"qty": "", "price": "5.00"}, ...]</pre></div>
+                </div>
+                <div class="trace-row">
+                    <div class="trace-step">step 2<br>diverged</div>
+                    <div class="trace-code"><pre><span class="who">careful-agent</span>clean = [r for r in rows if r["qty"] and r["price"]]  <span class="diff-add"># drop incomplete rows</span>
+<span class="who">thorough-agent</span>clean = [{**r, "qty": r["qty"] or "0", "price": r["price"] or "0"} for r in rows]  <span class="diff-add"># fill instead</span>
+<span class="who fail-who">reckless-agent</span>total = sum(int(r["qty"]) * float(r["price"]) for r in rows)  <span class="diff-fail"># no guard -&gt; ValueError on ''</span></pre></div>
+                </div>
+            </div>
+
+            <div class="cta">
+                <a href="https://github.com/ashishgituser/bunkervm#readme" class="btn btn-glow" target="_blank">Read the docs</a>
+                <a href="https://github.com/ashishgituser/bunkervm" class="btn btn-ghost" target="_blank">View on GitHub &#8599;</a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <span>Generated by <code>bunkervm.report</code> from real recorded sessions &mdash; not a mockup.</span>
+            <a href="index.html">&larr; BunkerVM</a>
+        </div>
+    </footer>
+
+</body>
+</html>
