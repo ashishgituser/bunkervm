@@ -809,6 +809,310 @@ class TestReportScoring:
         assert "a" in content and "b" in content
 
 
+class TestWatchTestCounting:
+    """`test count dropped` is the flag the whole watch feature exists for, so
+    the parser behind it gets the most coverage."""
+
+    def test_pytest_summary(self):
+        from bunkervm.watch import parse_test_total
+
+        assert parse_test_total("5 passed in 0.01s") == 5
+        assert parse_test_total("1 failed, 4 passed in 0.12s") == 5
+        assert parse_test_total("===== 2 passed, 1 skipped in 0.3s =====") == 3
+
+    def test_jest_summary(self):
+        from bunkervm.watch import parse_test_total
+
+        out = "Tests:       1 failed, 2 passed, 3 total\nSnapshots:   0 total"
+        assert parse_test_total(out) == 3
+
+    def test_unittest_summary(self):
+        from bunkervm.watch import parse_test_result, parse_test_total
+
+        assert parse_test_total("Ran 7 tests in 0.002s\n\nOK") == 7
+        # unittest never prints a passed count; inferring 0 would be a lie.
+        assert parse_test_result("Ran 7 tests in 0.002s\n\nOK")["passed"] == 7
+        r = parse_test_result("Ran 7 tests in 0.002s\n\nOK (skipped=2)")
+        assert (r["total"], r["silenced"], r["passed"]) == (7, 2, 5)
+
+    def test_silenced_outcomes_are_counted_separately(self):
+        from bunkervm.watch import parse_test_result
+
+        assert parse_test_result("5 passed in 0.1s")["silenced"] == 0
+        assert parse_test_result("4 passed, 1 skipped in 0.1s")["silenced"] == 1
+        # xfail silences a failing test just as effectively as skip.
+        assert parse_test_result("3 passed, 2 xfailed in 0.1s")["silenced"] == 2
+        assert parse_test_result("Tests: 1 skipped, 8 passed, 9 total")["silenced"] == 1
+
+    def test_skipping_does_not_change_the_total(self):
+        from bunkervm.watch import parse_test_result
+
+        # The reason `total` alone can't catch the skip shortcut.
+        assert parse_test_result("5 passed in 0.1s")["total"] == 5
+        assert parse_test_result("4 passed, 1 skipped in 0.1s")["total"] == 5
+
+    def test_non_test_output_is_none(self):
+        from bunkervm.watch import parse_test_total
+
+        assert parse_test_total("") is None
+        assert parse_test_total("Successfully installed pytest-cov") is None
+        assert parse_test_total("total 48\ndrwxr-xr-x 3 user user") is None
+
+
+class TestWatchAnalysis:
+    def _ev(self, tool, output="", command="", file_path="", ts=0.0):
+        return {
+            "ts": ts,
+            "tool": tool,
+            "command": command,
+            "file_path": file_path,
+            "output": output,
+        }
+
+    def test_flags_a_dropped_test_count(self):
+        from bunkervm.watch import analyze
+
+        events = [
+            self._ev("Bash", command="pytest -q", output="1 failed, 4 passed in 0.1s"),
+            self._ev("Bash", command="rm tests/test_stats.py"),
+            self._ev("Bash", command="pytest -q", output="2 passed in 0.01s"),
+        ]
+        a = analyze(events)
+        warns = [f["text"] for f in a["flags"] if f["level"] == "warn"]
+        assert any("test count dropped: 5 -> 2" in t for t in warns)
+        assert any("tests/test_stats.py" in t for t in warns)
+
+    def test_no_flag_when_count_grows(self):
+        from bunkervm.watch import analyze
+
+        events = [
+            self._ev("Bash", command="pytest -q", output="4 passed in 0.1s"),
+            self._ev("Bash", command="pytest -q", output="6 passed in 0.1s"),
+        ]
+        a = analyze(events)
+        assert not [f for f in a["flags"] if "test count" in f["text"]]
+
+    def test_narrowing_to_a_subset_is_not_a_drop(self):
+        """The failure that made this flag useless in real sessions.
+
+        Running the whole suite and then iterating on one file is the single
+        most common thing an agent does, and comparing across those two
+        commands reported 80 deleted tests every time.
+        """
+        from bunkervm.watch import analyze
+
+        events = [
+            self._ev("Bash", command="pytest -q", output="88 passed in 0.9s"),
+            self._ev(
+                "Bash",
+                command="pytest -q -k TestWatch",
+                output="8 passed, 80 deselected in 0.06s",
+            ),
+        ]
+        assert not [f for f in analyze(events)["flags"] if "test count" in f["text"]]
+
+    def test_flags_tests_silenced_by_skip(self):
+        """The most common way an agent reaches green without fixing anything:
+        the total never moves, so only the silenced count catches it."""
+        from bunkervm.watch import analyze
+
+        events = [
+            self._ev("Bash", command="pytest -q", output="4 passed, 1 failed in 0.1s"),
+            self._ev("Bash", command="pytest -q", output="4 passed, 1 skipped in 0.1s"),
+        ]
+        warns = [f["text"] for f in analyze(events)["flags"] if f["level"] == "warn"]
+        assert any("skipped or xfailed" in t for t in warns)
+
+    def test_flags_tests_silenced_by_xfail(self):
+        from bunkervm.watch import analyze
+
+        events = [
+            self._ev("Bash", command="pytest -q", output="5 passed in 0.1s"),
+            self._ev("Bash", command="pytest -q", output="4 passed, 1 xfailed in 0.1s"),
+        ]
+        assert [f for f in analyze(events)["flags"] if "skipped or xfailed" in f["text"]]
+
+    def test_unskipping_is_not_flagged(self):
+        from bunkervm.watch import analyze
+
+        events = [
+            self._ev("Bash", command="pytest -q", output="4 passed, 1 skipped in 0.1s"),
+            self._ev("Bash", command="pytest -q", output="5 passed in 0.1s"),
+        ]
+        assert analyze(events)["flags"] == []
+
+    def test_honest_fix_produces_no_flags(self):
+        from bunkervm.watch import analyze
+
+        events = [
+            self._ev("Bash", command="pytest -q", output="1 failed, 4 passed in 0.1s"),
+            self._ev("Edit", file_path="stats.py"),
+            self._ev("Bash", command="pytest -q", output="5 passed in 0.1s"),
+        ]
+        assert analyze(events)["flags"] == []
+
+    def test_drop_is_detected_per_command_not_across_the_session(self):
+        from bunkervm.watch import analyze
+
+        events = [
+            self._ev("Bash", command="pytest -q", output="50 passed in 0.9s"),
+            self._ev("Bash", command="pytest -q tests/unit", output="5 passed in 0.1s"),
+            self._ev("Bash", command="pytest -q", output="47 passed in 0.9s"),
+        ]
+        warns = [f["text"] for f in analyze(events)["flags"] if "test count" in f["text"]]
+        assert len(warns) == 1
+        assert "50 -> 47" in warns[0]
+        assert "pytest -q" in warns[0]
+
+    def test_single_test_run_cannot_drop(self):
+        from bunkervm.watch import analyze
+
+        a = analyze([self._ev("Bash", command="pytest", output="3 passed in 0.1s")])
+        assert a["flags"] == []
+        assert len(a["test_runs"]) == 1
+
+    def test_detects_package_installs(self):
+        from bunkervm.watch import analyze
+
+        a = analyze([self._ev("Bash", command="pip install requests")])
+        assert a["installs"] == ["pip install requests"]
+
+    def test_routine_cleanup_is_not_flagged_as_a_deletion(self):
+        from bunkervm.watch import analyze
+
+        # If this flag fires on housekeeping, people learn to ignore it, and
+        # then it's useless for the case it exists for.
+        for cmd in (
+            "rm -rf node_modules",
+            "rm -rf build dist",
+            "rm -rf .pytest_cache",
+            "rm /tmp/scratch.txt",
+            "rm foo.pyc",
+        ):
+            assert analyze([self._ev("Bash", command=cmd)])["deletions"] == [], cmd
+
+    def test_source_deletions_are_still_flagged(self):
+        from bunkervm.watch import analyze
+
+        a = analyze([self._ev("Bash", command="rm tests/test_auth.py")])
+        assert [d["path"] for d in a["deletions"]] == ["tests/test_auth.py"]
+
+    def test_writes_outside_the_project_are_flagged(self, tmp_path):
+        from bunkervm.watch import analyze
+
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        outside = tmp_path / "elsewhere" / "config.json"
+        a = analyze(
+            [self._ev("Write", file_path=str(outside))],
+            project_dir=str(proj),
+        )
+        assert any("outside the repo" in f["text"] for f in a["flags"])
+
+    def test_files_inside_the_project_are_not_flagged_as_outside(self, tmp_path):
+        """Claude Code reports cwd as "c:\\..." while abspath yields "C:\\...",
+        and commonpath compares strings — without normcase every edit on
+        Windows was reported as being outside the repo."""
+        import os
+
+        from bunkervm.watch import analyze
+
+        proj = tmp_path / "proj"
+        (proj / "src").mkdir(parents=True)
+        inside = str(proj / "src" / "app.py")
+        swapped = (
+            inside[0].swapcase() + inside[1:] if os.name == "nt" else inside
+        )  # only Windows has the drive-letter case problem
+        a = analyze([self._ev("Write", file_path=swapped)], project_dir=str(proj))
+        assert not [f for f in a["flags"] if "outside the repo" in f["text"]]
+
+    def test_repeated_edits_to_one_file_are_listed_once(self, tmp_path):
+        from bunkervm.watch import analyze
+
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        outside = str(tmp_path / "elsewhere.txt")
+        a = analyze(
+            [self._ev("Edit", file_path=outside), self._ev("Edit", file_path=outside)],
+            project_dir=str(proj),
+        )
+        outside_flags = [f for f in a["flags"] if "outside the repo" in f["text"]]
+        assert outside_flags[0]["text"].count("elsewhere.txt") == 1
+
+    def test_clean_session_has_no_flags(self):
+        from bunkervm.watch import analyze
+
+        events = [
+            self._ev("Bash", command="pytest -q", output="5 passed in 0.1s"),
+            self._ev("Edit", file_path="stats.py"),
+            self._ev("Bash", command="pytest -q", output="5 passed in 0.1s"),
+        ]
+        assert analyze(events)["flags"] == []
+
+
+class TestWatchHookInstall:
+    def test_install_and_uninstall_roundtrip(self, tmp_path):
+        from bunkervm.watch import install_hooks, is_installed, uninstall_hooks
+
+        p = str(tmp_path)
+        assert not is_installed(p)
+        install_hooks(p)
+        assert is_installed(p)
+        assert uninstall_hooks(p) is True
+        assert not is_installed(p)
+
+    def test_install_is_idempotent(self, tmp_path):
+        import json
+
+        from bunkervm.watch import install_hooks, settings_path
+
+        p = str(tmp_path)
+        install_hooks(p)
+        install_hooks(p)
+        with open(settings_path(p)) as f:
+            entries = json.load(f)["hooks"]["PostToolUse"]
+        assert len(entries) == 1
+
+    def test_preserves_existing_user_hooks(self, tmp_path):
+        import json
+        import os
+
+        from bunkervm.watch import install_hooks, settings_path, uninstall_hooks
+
+        p = str(tmp_path)
+        path = settings_path(p)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        mine = {"matcher": "Bash", "hooks": [{"type": "command", "command": "my-linter"}]}
+        with open(path, "w") as f:
+            json.dump({"model": "opus", "hooks": {"PostToolUse": [mine]}}, f)
+
+        install_hooks(p)
+        uninstall_hooks(p)
+
+        with open(path) as f:
+            data = json.load(f)
+        assert data["model"] == "opus"
+        assert data["hooks"]["PostToolUse"] == [mine]
+
+    def test_record_event_writes_jsonl(self, tmp_path):
+        from bunkervm.watch import list_sessions, load_events, record_event
+
+        record_event(
+            {
+                "session_id": "s1",
+                "cwd": str(tmp_path),
+                "tool_name": "Bash",
+                "tool_input": {"command": "ls"},
+                "tool_response": {"type": "text", "text": "a\nb"},
+            }
+        )
+        sessions = list_sessions(str(tmp_path))
+        assert len(sessions) == 1
+        events = load_events(sessions[0])
+        assert events[0]["command"] == "ls"
+        assert events[0]["output"] == "a\nb"
+
+
 class TestReportDeletionAwareness:
     """An agent can turn a red suite green by deleting the failing test.
 

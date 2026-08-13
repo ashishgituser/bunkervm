@@ -4,6 +4,25 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-08-14
+
+### Added
+- **`bunkervm watch` / `bunkervm review`** — passive recording of coding-agent sessions via Claude Code hooks. `watch` installs a `PostToolUse` hook once per repo; every command the agent runs after that is logged to `.bunkervm/watch/<session>.jsonl` with no further involvement. `review` summarizes what the session actually did.
+
+  This exists because every other entry point in BunkerVM asks you to set up an experiment *before* the thing you'd want to inspect happens, which is why none of them get used daily. The flag it's built around is **`test count dropped: 12 -> 9`** — an agent can turn a red suite green by deleting the failing test, and `git diff` shows you that deleted file in a large diff without you registering that the suite shrank.
+
+  Test totals are parsed from output shape rather than from the command, so pytest, jest and unittest all work regardless of whether the suite was invoked via `make`, `tox`, or a wrapper script. Counts are compared **per command**, not across the session: running the whole suite and then iterating on a single file is the most common thing an agent does, and comparing across those two invocations reported "80 fewer tests" every session. Routine cleanup (`rm -rf node_modules`, `dist/`, `*.pyc`, `/tmp/...`) is likewise excluded from the deletion flag — a warning people learn to ignore is worse than no warning.
+
+  Verified against a live Claude Code session in this repo rather than only synthetic payloads, which is how both of those false positives were found; a third (every edit on Windows reported as "outside the repo", because Claude Code reports `cwd` as `c:\...` while `abspath` yields `C:\...` and `commonpath` compares strings) came out of the same run.
+
+  The hook is written to never break or slow the agent: it only appends a line of JSON, and it swallows every exception and exits 0 rather than surfacing a hook error mid-session. Installing preserves any hooks you already had, and `watch --off` removes only ours. Needs no VM or KVM; works on macOS, Linux and Windows.
+
+- **Silenced-test detection.** Test count alone only catches an agent that *deletes* the failing test. Adding `@pytest.mark.skip` or `xfail` reaches the same green suite while leaving the total untouched — `5 passed` and `4 passed, 1 skipped` both parse as 5 — and it's the shortcut a model is more likely to reach for, since it feels less destructive. `parse_test_result()` now returns `total` / `passed` / `silenced`, and a rise in `silenced` for the same command is flagged separately. Un-skipping is never flagged. Covers pytest (`skipped`, `xfailed`), jest (`skipped`, `todo`) and unittest (`OK (skipped=N)`).
+
+  Still not caught, and stated plainly in the README: an agent that weakens an assertion or mocks the thing under test. Neither is visible in test output.
+
+- `docs/watch.mp4` / `docs/watch.gif` — demo video for the watch/review workflow. Light theme, authored as SVG and rasterised via resvg at 2x for clean type (`docs/make-watch-video.py`); every terminal block in it is copied from real recorded sessions.
+
 ## [0.12.0] — 2026-08-13
 
 The theme: an agent can turn a failing test suite green by deleting the test. Exit codes can't tell that apart from a real fix — the filesystem trace can, and `compare` now uses it.

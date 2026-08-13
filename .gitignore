@@ -50,3 +50,6 @@ desktop/build/BunkerDesktop/
 
 # Installer output
 installer/windows/Output/
+
+# Local Claude Code hook config (bunkervm watch installs here)
+.claude/settings.json

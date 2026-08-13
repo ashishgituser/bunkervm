@@ -42,6 +42,58 @@ It also happens to run each sandbox in a hardware-isolated [Firecracker](https:/
 
 ---
 
+## Start here: watch what your coding agent does
+
+Everything else in this README asks you to set something up before it helps you. This doesn't. If you use Claude Code, turn it on once per repo and forget about it:
+
+```bash
+bunkervm watch
+```
+
+That installs a `PostToolUse` hook. From then on, every command your agent runs is recorded in the background. When it says it's done, ask what actually happened:
+
+```bash
+bunkervm review
+```
+
+```
+Session 4f2a91c8  5 commands, 1 edit, 14m
+
+  ! test count dropped: 12 -> 9 (3 fewer) running `npm test`
+  ! deleted: src/__tests__/auth.test.js
+  ! installed 1 package(s): npm install
+
+  test runs: 3   tests in last run: 9
+  files edited: 1
+      src/auth.js
+```
+
+That first line is the reason this exists. An agent can turn a red suite green by deleting the failing test, and `git diff` will happily show you the deleted file in the middle of a large diff without you registering that the suite got smaller. A number going down is much harder to skim past.
+
+Deleting isn't the only way, so the count alone isn't enough:
+
+| How the agent got to green | Suite size | Caught by |
+|---|---|---|
+| Deleted the failing test | shrinks | test count dropped |
+| Added `@pytest.mark.skip` | unchanged | tests silenced |
+| Marked it `xfail` | unchanged | tests silenced |
+| Actually fixed the bug | unchanged | *nothing — no flag* |
+
+```
+! 1 more test skipped or xfailed (0 -> 1) running `pytest -q` -
+  silenced tests turn a suite green without fixing anything
+```
+
+47 tests before, 47 after, nothing deleted — only the skipped count moved.
+
+It's deliberately quiet, because a warning people learn to ignore is worse than no warning. Counts are only ever compared **per command**: running the whole suite and then iterating on one file is the most common thing an agent does, and it must not read as 80 deleted tests. Routine cleanup (`rm -rf node_modules`, `dist/`, `*.pyc`) never fires the deletion flag either, and un-skipping a test is never flagged.
+
+It does not catch everything. An agent that weakens an assertion or mocks out the thing under test still passes silently — those don't show up in test output, so nothing here can see them.
+
+No VM, no KVM, works on macOS/Linux/Windows. Turn it off with `bunkervm watch --off`. Logs go to `.bunkervm/watch/` (already gitignored) and never leave your machine.
+
+---
+
 ## Two ways to run it
 
 | | Firecracker (`Sandbox()`) | Local (`Sandbox(backend="local")`) |

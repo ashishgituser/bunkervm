@@ -1387,6 +1387,134 @@ def _format_duration(seconds: float) -> str:
         return f"{h}h {m}m"
 
 
+# ── Watch / Review Commands ──
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    """Install (or remove) the Claude Code hook that records agent sessions."""
+    from . import watch as w
+
+    project = os.path.abspath(args.path or os.getcwd())
+    scope = "user" if getattr(args, "user", False) else "project"
+
+    if getattr(args, "off", False):
+        if w.uninstall_hooks(project, scope):
+            _print(f"{_CHECK} Stopped recording agent sessions in {project}")
+        else:
+            _print(f"{_DIM}Nothing to remove — recording wasn't enabled here.{_RESET}")
+        return 0
+
+    if w.is_installed(project, scope):
+        _print(f"{_CHECK} Already recording agent sessions in {project}")
+    else:
+        path = w.install_hooks(project, scope)
+        _print(f"{_CHECK} Recording agent sessions in {project}")
+        _print(f"{_DIM}  hook added to {path}{_RESET}")
+        _print(f"{_DIM}  takes effect immediately (restart Claude Code if not){_RESET}")
+
+    _print()
+    _print(f"{_DIM}Logs are written to {w.WATCH_DIRNAME}{os.sep}<session>.jsonl -{_RESET}")
+    _print(f"{_DIM}worth adding {w.WATCH_DIRNAME} to .gitignore.{_RESET}")
+    _print(f"  {_ARROW} Review a session:  {_CYAN}bunkervm review{_RESET}")
+    _print(f"  {_ARROW} Stop recording:    {_CYAN}bunkervm watch --off{_RESET}")
+    return 0
+
+
+def cmd_hook(args: argparse.Namespace) -> int:
+    """Hidden: invoked by Claude Code on PostToolUse. Reads a payload on stdin.
+
+    This runs inside the agent's tool loop, so it must never fail loudly — a
+    traceback here would surface to the user as a hook error mid-session. Any
+    problem is swallowed and the event is simply not recorded.
+    """
+    from . import watch as w
+
+    try:
+        payload = json.load(sys.stdin)
+        w.record_event(payload)
+    except Exception:
+        pass
+    return 0
+
+
+def cmd_review(args: argparse.Namespace) -> int:
+    """Summarize what an agent actually did during a recorded session."""
+    from . import watch as w
+
+    project = os.path.abspath(args.path or os.getcwd())
+    sessions = w.list_sessions(project)
+    if not sessions:
+        _print(f"{_CROSS} No recorded sessions in {project}")
+        _print(f"{_DIM}Turn on recording with:{_RESET} {_CYAN}bunkervm watch{_RESET}")
+        return 1
+
+    if getattr(args, "list", False):
+        _print(f"\n{_BOLD}Recorded sessions{_RESET}  {_DIM}({len(sessions)}){_RESET}\n")
+        for p in reversed(sessions):
+            sid = os.path.basename(p)[: -len(".jsonl")]
+            n = len(w.load_events(p))
+            when = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(p)))
+            _print(f"  {_CYAN}{sid}{_RESET}  {when}  {n} events")
+        _print()
+        return 0
+
+    path = sessions[-1]
+    if getattr(args, "session", None):
+        matches = [p for p in sessions if os.path.basename(p).startswith(args.session)]
+        if not matches:
+            _print(f"{_CROSS} No session matching {args.session!r}")
+            return 1
+        path = matches[-1]
+
+    events = w.load_events(path)
+    if not events:
+        _print(f"{_DIM}Session is empty — the agent hasn't run any tools yet.{_RESET}")
+        return 0
+
+    a = w.analyze(events, project_dir=project)
+    sid = os.path.basename(path)[: -len(".jsonl")]
+
+    if getattr(args, "format", "text") == "json":
+        print(json.dumps(a, indent=2, default=str))
+        return 0
+
+    def _n(count: int, word: str) -> str:
+        return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+    _print(
+        f"\n{_BOLD}Session {sid[:8]}{_RESET}  {_DIM}{_n(a['commands'], 'command')}, "
+        f"{_n(a['edits'], 'edit')}, {_format_duration(a['duration_s'])}{_RESET}"
+    )
+    _print()
+
+    for f in a["flags"]:
+        colour = _YELLOW if f["level"] == "warn" else _DIM
+        _print(f"  {colour}! {f['text']}{_RESET}")
+    if not a["flags"]:
+        _print(f"  {_GREEN}{_CHECK} Nothing worth flagging.{_RESET}")
+    _print()
+
+    if a["test_runs"]:
+        # Deliberately not "first -> last": those are often different commands
+        # (whole suite, then a single file), so an arrow between them reads as
+        # a drop that never happened. The comparison lives in the flag, where
+        # it's like-for-like.
+        last = a["test_runs"][-1]
+        _print(
+            f"  {_DIM}test runs:{_RESET} {len(a['test_runs'])}   "
+            f"{_DIM}tests in last run:{_RESET} {last['total']}"
+        )
+
+    if a["files"]:
+        _print(f"  {_DIM}files edited:{_RESET} {len(a['files'])}")
+        for p in a["files"][:8]:
+            _print(f"      {os.path.relpath(p, project) if os.path.isabs(p) else p}")
+        if len(a["files"]) > 8:
+            _print(f"      {_DIM}... and {len(a['files']) - 8} more{_RESET}")
+    _print()
+    return 0
+
+
 # ── Main CLI Parser ──
 
 
@@ -1586,6 +1714,33 @@ examples:
     )
     compare_p.add_argument("--html", metavar="PATH", help="Also write an HTML report to PATH")
     compare_p.set_defaults(func=cmd_compare)
+
+    # ── watch ──
+    watch_p = sub.add_parser(
+        "watch", help="Record what your coding agent does, automatically (Claude Code)"
+    )
+    watch_p.add_argument("path", nargs="?", help="Project directory (default: cwd)")
+    watch_p.add_argument("--off", action="store_true", help="Stop recording in this project")
+    watch_p.add_argument(
+        "--user",
+        action="store_true",
+        help="Install into ~/.claude/settings.json instead of this project",
+    )
+    watch_p.set_defaults(func=cmd_watch)
+
+    # ── review ──
+    review_p = sub.add_parser("review", help="What did the agent actually do this session?")
+    review_p.add_argument("session", nargs="?", help="Session ID prefix (default: most recent)")
+    review_p.add_argument("--path", help="Project directory (default: cwd)")
+    review_p.add_argument("--list", action="store_true", help="List recorded sessions")
+    review_p.add_argument(
+        "--format", choices=["text", "json"], default="text", help="Output format (default: text)"
+    )
+    review_p.set_defaults(func=cmd_review)
+
+    # ── _hook (hidden — invoked by Claude Code, not by humans) ──
+    hook_p = sub.add_parser("_hook")
+    hook_p.set_defaults(func=cmd_hook)
 
     args = parser.parse_args()
 
