@@ -1061,6 +1061,49 @@ class TestWatchHookInstall:
         assert uninstall_hooks(p) is True
         assert not is_installed(p)
 
+    def test_hook_command_is_an_absolute_path_when_resolvable(self):
+        """A bare "bunkervm _hook" breaks silently for anyone who installed
+        into a venv, because Claude Code's hook shell may not have it on
+        PATH — and the symptom is `review` reporting no sessions at all."""
+        import os
+
+        from bunkervm.watch import hook_command
+
+        cmd = hook_command()
+        assert cmd.endswith("_hook")
+        exe = cmd[: -len(" _hook")].strip('"')
+        if exe != "bunkervm":  # resolvable in this environment
+            assert os.path.isabs(exe), cmd
+
+    def test_recognises_hooks_written_by_older_versions(self, tmp_path):
+        """Upgrades must still be able to find and remove the old bare-string
+        form, or `watch --off` silently leaves it behind."""
+        import json
+        import os
+
+        from bunkervm.watch import is_installed, uninstall_hooks
+
+        p = str(tmp_path)
+        path = os.path.join(p, ".claude", "settings.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(
+                {
+                    "hooks": {
+                        "PostToolUse": [
+                            {
+                                "matcher": "Bash",
+                                "hooks": [{"type": "command", "command": "bunkervm _hook"}],
+                            }
+                        ]
+                    }
+                },
+                f,
+            )
+        assert is_installed(p)
+        assert uninstall_hooks(p) is True
+        assert not is_installed(p)
+
     def test_install_is_idempotent(self, tmp_path):
         import json
 

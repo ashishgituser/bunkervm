@@ -4,6 +4,15 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+## [0.13.1] — 2026-08-14
+
+### Fixed
+- **`bunkervm watch` wired the hook to a bare `bunkervm _hook`**, which silently did nothing for anyone who installed into a virtualenv — the shell Claude Code spawns hooks in doesn't necessarily have that venv on `PATH`. Because the hook swallows its own errors by design, the symptom was no error at all: you'd work all day and `bunkervm review` would report no recorded sessions. It now writes the absolute path of the executable you invoked.
+
+  Resolution order is `sys.argv[0]` before `shutil.which("bunkervm")`, deliberately: asking `PATH` first finds whichever copy is globally first, so running the venv's `bunkervm watch` on a machine that also has a global install wired the hook to the *global* (possibly older) copy.
+
+  Hook detection is now shape-based rather than an exact string match, so hooks written by 0.13.0 are still recognised — `watch` won't double-install over one, and `watch --off` still removes it.
+
 ## [0.13.0] — 2026-08-14
 
 ### Added

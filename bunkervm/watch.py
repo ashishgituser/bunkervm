@@ -31,6 +31,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import sys
 import time
 from typing import Optional
 
@@ -41,7 +43,32 @@ WATCH_DIRNAME = os.path.join(".bunkervm", "watch")
 # recorded so file activity is visible without shelling out to git.
 _HOOK_MATCHER = "Bash|Edit|Write|NotebookEdit"
 _HOOK_EVENT = "PostToolUse"
-_HOOK_COMMAND = "bunkervm _hook"
+
+
+def hook_command() -> str:
+    """The command Claude Code should invoke, as an absolute path when we can
+    resolve one.
+
+    Writing a bare "bunkervm _hook" is the obvious thing and it's wrong: the
+    common install is `pip install bunkervm` inside a project venv, and the
+    shell Claude Code spawns hooks in does not necessarily have that venv on
+    PATH. The failure is silent and looks exactly like the feature not working
+    — you'd work all day and `review` would report no sessions.
+    """
+    # argv[0] first, deliberately: it is the interpreter/console script the
+    # user actually invoked. Asking PATH instead picks whichever bunkervm comes
+    # first globally, so a venv install would silently wire the hook to a
+    # different (possibly older) copy than the one being configured.
+    exe = ""
+    argv0 = sys.argv[0] if sys.argv else ""
+    if argv0 and os.path.isabs(argv0) and "bunkervm" in os.path.basename(argv0).lower():
+        exe = argv0
+    if not exe:
+        exe = shutil.which("bunkervm") or ""
+    if not exe:
+        return "bunkervm _hook"  # last resort; PATH had better be right
+    return f'"{exe}" _hook' if " " in exe else f"{exe} _hook"
+
 
 _MAX_OUTPUT = 20000
 
@@ -66,9 +93,15 @@ def _load_settings(path: str) -> dict:
 
 
 def _our_hook(entry: dict) -> bool:
-    """Is this matcher block one we installed? Matched on the command, so a
+    """Is this matcher block one we installed? Matched loosely on shape rather
+    than on an exact string, so a hook written by an older version (or by a
+    different install path) is still recognised for upgrade and removal. A
     user's own PostToolUse hooks are never touched."""
-    return any(h.get("command") == _HOOK_COMMAND for h in entry.get("hooks", []))
+    for h in entry.get("hooks", []):
+        cmd = (h.get("command") or "").strip().replace("\\", "/")
+        if cmd.endswith("_hook") and "bunkervm" in cmd.lower():
+            return True
+    return False
 
 
 def install_hooks(project_dir: str, scope: str = "project") -> str:
@@ -84,7 +117,7 @@ def install_hooks(project_dir: str, scope: str = "project") -> str:
     entries.append(
         {
             "matcher": _HOOK_MATCHER,
-            "hooks": [{"type": "command", "command": _HOOK_COMMAND}],
+            "hooks": [{"type": "command", "command": hook_command()}],
         }
     )
 
