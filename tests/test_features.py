@@ -977,6 +977,88 @@ class TestWatchAnalysis:
         a = analyze([self._ev("Bash", command="pip install requests")])
         assert a["installs"] == ["pip install requests"]
 
+    def test_install_summary_stops_at_the_next_statement(self):
+        from bunkervm.watch import analyze
+
+        cmd = 'pip install cairosvg -q 2>&1 | tail -3; python -c "\nimport cairosvg\nprint(1)\n"'
+        a = analyze([self._ev("Bash", command=cmd)])
+        assert a["installs"] == ["pip install cairosvg -q 2>&1 | tail -3"]
+        assert "python -c" not in a["flags"][0]["text"]
+
+    def test_rm_inside_an_embedded_script_is_not_a_deletion(self):
+        """Real agent commands routinely carry a heredoc'd script. Matching
+        `rm` anywhere in the string reported phantom deletions whose "paths"
+        were fragments of Python source."""
+        from bunkervm.watch import analyze
+
+        cmd = (
+            'cd /tmp/x && python - <<\'PY\'\n'
+            'send("Bash",{"command":"rm -rf node_modules"},"")\n'
+            'send("Bash",{"command":"rm src/__tests__/auth.test.js"},"")\n'
+            "PY"
+        )
+        assert analyze([self._ev("Bash", command=cmd)])["deletions"] == []
+
+    def test_rm_must_sit_at_a_statement_boundary(self):
+        from bunkervm.watch import analyze
+
+        # Mentioned, not executed.
+        assert analyze([self._ev("Bash", command="echo 'how to rm files'")])["deletions"] == []
+        assert analyze([self._ev("Bash", command="grep -rn rm src/")])["deletions"] == []
+        # Actually executed, in several shapes.
+        for cmd in ("rm notes.txt", "cd src && rm notes.txt", "true; rm notes.txt", "true\nrm notes.txt"):
+            assert [d["path"] for d in analyze([self._ev("Bash", command=cmd)])["deletions"]] == [
+                "notes.txt"
+            ], cmd
+
+    def test_rm_reports_multiple_real_targets(self):
+        from bunkervm.watch import analyze
+
+        a = analyze([self._ev("Bash", command="rm tests/a.py tests/b.py")])
+        assert [d["path"] for d in a["deletions"]] == ["tests/a.py", "tests/b.py"]
+
+    def test_the_same_path_deleted_twice_is_listed_once(self):
+        from bunkervm.watch import analyze
+
+        a = analyze(
+            [
+                self._ev("Bash", command="rm src/a.py"),
+                self._ev("Bash", command="rm src/a.py"),
+            ]
+        )
+        assert len(a["deletions"]) == 1
+
+    def test_only_bash_events_count_as_test_runs(self):
+        """An Edit whose output happens to mention "skipped" is not a test run.
+        Counting them inflated the run count and produced a flag attributed to
+        an empty command."""
+        from bunkervm.watch import analyze
+
+        a = analyze(
+            [
+                self._ev("Edit", file_path="notes.md", output="4 passed, 1 skipped in 0.1s"),
+                self._ev("Write", file_path="x.py", output="5 passed in 0.1s"),
+            ]
+        )
+        assert a["test_runs"] == []
+        assert a["flags"] == []
+
+    def test_flag_text_never_embeds_a_whole_multiline_command(self):
+        from bunkervm.watch import analyze
+
+        long_cmd = 'pip install cairosvg -q 2>&1 | tail -3; python -c "\nimport cairosvg\nprint(1)\n"'
+        a = analyze([self._ev("Bash", command=long_cmd)])
+        text = a["flags"][0]["text"]
+        assert "\n" not in text
+        assert len(text) < 140
+
+    def test_short_cmd(self):
+        from bunkervm.watch import short_cmd
+
+        assert short_cmd("pytest -q") == "pytest -q"
+        assert short_cmd("pytest -q\nsecond line") == "pytest -q"
+        assert len(short_cmd("x" * 200)) <= 60
+
     def test_routine_cleanup_is_not_flagged_as_a_deletion(self):
         from bunkervm.watch import analyze
 

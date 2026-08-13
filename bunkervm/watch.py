@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import sys
 import time
@@ -298,12 +299,134 @@ def parse_test_total(output: str) -> Optional[int]:
     return result["total"] if result else None
 
 
-_INSTALL = re.compile(
-    r"\b(?:pip3?\s+install|uv\s+pip\s+install|npm\s+(?:i|install|add)\b"
-    r"|yarn\s+add|pnpm\s+add|poetry\s+add|cargo\s+add|go\s+get)\b",
-    re.I,
-)
-_RM = re.compile(r"\brm\s+(?!-\w*[hv])(?:-\S+\s+)*(\S+)", re.I)
+_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*")
+
+# Fragments that mean the regex ran off into embedded source rather than a
+# real shell argument.
+_NOT_A_PATH = re.compile(r"""["'{}()\[\]<>=,]|^\$|^-""")
+
+
+def _shell_part(command: str) -> str:
+    """The portion of a command that is actually shell.
+
+    Everything from a heredoc marker onwards is another language's source, and
+    scanning it for shell constructs produces nonsense.
+    """
+    cut = command.find("<<")
+    return command if cut == -1 else command[:cut]
+
+
+def _raw_shell_statements(command: str) -> list[str]:
+    """Split shell source at unquoted statement separators.
+
+    This is intentionally a small shell-ish scanner, not a full parser. It is
+    enough for review flags: don't let `; python -c ...` leak into an install
+    warning, and treat multi-line commands as multiple statements while leaving
+    newlines inside quoted Python snippets alone.
+    """
+    source = _shell_part(command)
+    statements = []
+    start = 0
+    quote = ""
+    escaped = False
+    i = 0
+    while i < len(source):
+        ch = source[i]
+        if quote:
+            if escaped:
+                escaped = False
+            elif ch == "\\" and quote == '"':
+                escaped = True
+            elif ch == quote:
+                quote = ""
+        elif ch in ("'", '"'):
+            quote = ch
+        elif ch in (";", "\n"):
+            statements.append(source[start:i])
+            start = i + 1
+        elif source.startswith("&&", i) or source.startswith("||", i):
+            statements.append(source[start:i])
+            i += 1
+            start = i + 1
+        i += 1
+
+    statements.append(source[start:])
+    return [s.strip() for s in statements if s.strip()]
+
+
+def _shell_tokens(statement: str) -> list[str]:
+    try:
+        lex = shlex.shlex(statement, posix=True, punctuation_chars="&|()")
+        lex.whitespace_split = True
+        lex.commenters = ""
+        return list(lex)
+    except ValueError:
+        return []
+
+
+def _command_start(tokens: list[str]) -> int:
+    i = 0
+    if i < len(tokens) and tokens[i] == "sudo":
+        i += 1
+    while i < len(tokens) and _ASSIGNMENT.match(tokens[i]):
+        i += 1
+    return i
+
+
+def _is_install_statement(statement: str) -> bool:
+    tokens = _shell_tokens(statement)
+    i = _command_start(tokens)
+    if i >= len(tokens):
+        return False
+
+    cmd = tokens[i].lower()
+    nxt = tokens[i + 1].lower() if i + 1 < len(tokens) else ""
+    nxt2 = tokens[i + 2].lower() if i + 2 < len(tokens) else ""
+
+    if cmd in ("pip", "pip3") and nxt == "install":
+        return True
+    if cmd == "uv" and nxt == "pip" and nxt2 == "install":
+        return True
+    if cmd == "npm" and nxt in ("i", "install", "add"):
+        return True
+    return (cmd, nxt) in {
+        ("yarn", "add"),
+        ("pnpm", "add"),
+        ("poetry", "add"),
+        ("cargo", "add"),
+        ("go", "get"),
+    }
+
+
+def _rm_targets(statement: str) -> list[str]:
+    tokens = _shell_tokens(statement)
+    if "|" in tokens or "|&" in tokens:
+        return []
+
+    i = _command_start(tokens)
+    if i >= len(tokens) or tokens[i] != "rm":
+        return []
+
+    targets = []
+    for token in tokens[i + 1 :]:
+        if token in ("--help", "--version", "-h"):
+            return []
+        if token == "--":
+            continue
+        if token.startswith("-"):
+            continue
+        targets.append(token)
+    return targets
+
+
+def short_cmd(command: str, limit: int = 60) -> str:
+    """One-line, length-capped form of a command, for flag text.
+
+    Real agent commands are frequently multi-line with embedded scripts;
+    interpolating one whole into a warning makes the warning unreadable.
+    """
+    first = command.strip().splitlines()[0].strip() if command.strip() else ""
+    return first if len(first) <= limit else first[: limit - 3].rstrip() + "..."
 
 # Deleting build output, caches and vendored deps is routine housekeeping. If
 # the deletion flag fires on `rm -rf node_modules` it becomes noise, and a flag
@@ -370,21 +493,37 @@ def analyze(events: list[dict], project_dir: Optional[str] = None) -> dict:
     commands = [e for e in events if e.get("tool") == "Bash" and e.get("command")]
     edits = [e for e in events if e.get("tool") in ("Edit", "Write", "NotebookEdit")]
 
+    # Only Bash events with a command: an Edit whose *output* happens to contain
+    # "1 skipped" is not a test run, and counting it produces a flag attributed
+    # to an empty command.
     test_runs = []
-    for i, e in enumerate(events):
+    for e in commands:
         result = parse_test_result(e.get("output", ""))
         if result is not None:
-            test_runs.append({"index": i + 1, "command": e.get("command", ""), **result})
+            test_runs.append({"command": e["command"], **result})
 
-    installs = [e["command"] for e in commands if _INSTALL.search(e["command"])]
+    installs = []
+    for e in commands:
+        for statement in _raw_shell_statements(e["command"]):
+            if _is_install_statement(statement):
+                installs.append(short_cmd(statement))
 
     deletions = []
+    seen_paths = set()
     for e in commands:
-        for target in _RM.findall(e["command"]):
-            path = target.strip("'\"")
-            if _is_noise_deletion(path):
+        for statement in _raw_shell_statements(e["command"]):
+            targets = _rm_targets(statement)
+            if not targets:
                 continue
-            deletions.append({"path": path, "command": e["command"]})
+            cmd = short_cmd(statement)
+            for target in targets:
+                path = target.strip("'\"")
+                if not path or _NOT_A_PATH.search(path) or _is_noise_deletion(path):
+                    continue
+                if path in seen_paths:
+                    continue
+                seen_paths.add(path)
+                deletions.append({"path": path, "command": cmd})
 
     outside = []
     if project_dir:
@@ -414,7 +553,7 @@ def analyze(events: list[dict], project_dir: Optional[str] = None) -> dict:
                 "level": "warn",
                 "text": (
                     f"test count dropped: {first} -> {last} "
-                    f"({first - last} fewer) running `{cmd}`"
+                    f"({first - last} fewer) running `{short_cmd(cmd)}`"
                 ),
             }
         )
@@ -430,8 +569,8 @@ def analyze(events: list[dict], project_dir: Optional[str] = None) -> dict:
                 "level": "warn",
                 "text": (
                     f"{n} more test{'s' if n > 1 else ''} skipped or xfailed "
-                    f"({first} -> {last}) running `{cmd}` - silenced tests "
-                    f"turn a suite green without fixing anything"
+                    f"({first} -> {last}) running `{short_cmd(cmd)}` - silenced "
+                    f"tests turn a suite green without fixing anything"
                 ),
             }
         )
@@ -445,7 +584,7 @@ def analyze(events: list[dict], project_dir: Optional[str] = None) -> dict:
         flags.append(
             {
                 "level": "info",
-                "text": f"installed {len(installs)} package(s): {installs[0].strip()}"
+                "text": f"installed {len(installs)} package(s): {installs[0]}"
                 + (f" (+{len(installs) - 1} more)" if len(installs) > 1 else ""),
             }
         )

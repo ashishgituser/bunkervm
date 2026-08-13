@@ -4,6 +4,13 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+## [0.13.2] — 2026-08-14
+
+### Fixed
+- **`bunkervm review` now handles messy real agent commands instead of only tidy one-liners.** Test-run parsing now only considers Bash events with commands, so an Edit/Write event whose output mentions `skipped` no longer inflates the test-run count or produces a warning attributed to an empty command.
+
+  Delete detection now scans only the actual shell prefix before heredoc source and only treats `rm` as a command invocation, not as text inside embedded Python, `echo`, or `grep`. Multi-line commands are split at unquoted shell statement separators, so install warnings report the install statement instead of dumping an entire `pip install ...; python -c ...` blob into the flag.
+
 ## [0.13.1] — 2026-08-14
 
 ### Fixed
@@ -224,7 +231,11 @@ The theme: an agent can turn a failing test suite green by deleting the test. Ex
 - Bootstrap auto-download of Firecracker bundle
 - GitHub Pages landing site
 
-[Unreleased]: https://github.com/ashishgituser/bunkervm/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/ashishgituser/bunkervm/compare/v0.13.2...HEAD
+[0.13.2]: https://github.com/ashishgituser/bunkervm/compare/v0.13.1...v0.13.2
+[0.13.1]: https://github.com/ashishgituser/bunkervm/compare/v0.13.0...v0.13.1
+[0.13.0]: https://github.com/ashishgituser/bunkervm/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/ashishgituser/bunkervm/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/ashishgituser/bunkervm/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/ashishgituser/bunkervm/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ashishgituser/bunkervm/compare/v0.8.6...v0.10.0
