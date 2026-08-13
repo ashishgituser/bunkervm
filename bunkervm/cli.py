@@ -1307,7 +1307,7 @@ def _compute_diff(session_a: dict, session_b: dict) -> dict:
 
 def cmd_compare(args: argparse.Namespace) -> int:
     """Score and rank multiple recorded sessions side by side."""
-    from .report import compare_sessions, render_html_report
+    from .report import _result_text, compare_sessions, render_html_report
 
     sessions = []
     for ref in args.sessions:
@@ -1332,21 +1332,27 @@ def cmd_compare(args: argparse.Namespace) -> int:
         _print(f"\n{_BOLD}Agent Comparison{_RESET}  {_DIM}({len(sessions)} sessions){_RESET}\n")
         for s in result["sessions"]:
             marker = f"{_GREEN}#{s['rank']}{_RESET}" if s["rank"] == 1 else f"#{s['rank']}"
-            status = (
-                f"{_GREEN}completed{_RESET}"
-                if s["success"]
-                else f"{_RED}failed (step {s['failed_steps'][0] if s['failed_steps'] else '?'}){_RESET}"
-            )
+            colour = _GREEN if s["final_success"] else _RED
+            status = f"{colour}{_result_text(s)}{_RESET}"
             risky = s["risk_counts"]["destructive"] + s["risk_counts"]["blocked"]
             risk_note = f" {_RED}({risky} destructive/blocked){_RESET}" if risky else ""
             _print(
                 f"  {marker}  {_CYAN}{s['label']}{_RESET}  [{s['backend']}]  "
                 f"{s['steps']} steps  {status}  {s['total_duration_ms']:.0f}ms{risk_note}"
             )
+            # Show the full risk profile, not just destructive/blocked — a
+            # system-tier command (chmod, pip install) is exactly the kind of
+            # thing worth seeing, and it was previously HTML-report-only.
+            profile = "  ".join(
+                f"{level} x{count}" for level, count in s["risk_counts"].items() if count
+            )
             _print(
                 f"      files: +{s['files_created']} created  ~{s['files_modified']} modified  "
-                f"-{s['files_deleted']} deleted"
+                f"-{s['files_deleted']} deleted" + (f"   risk: {profile}" if profile else "")
             )
+            for f in s.get("flags", []):
+                colour = _YELLOW if f["level"] == "warn" else _DIM
+                _print(f"      {colour}! {f['text']}{_RESET}")
         if result["divergences"]:
             _print(f"\n  {_BOLD}Divergence from baseline ({result['baseline']}):{_RESET}")
             for d in result["divergences"]:
@@ -1355,8 +1361,10 @@ def cmd_compare(args: argparse.Namespace) -> int:
                 else:
                     _print(f"    {d['compared']}: diverged at step {d['first_diverging_step']}")
         _print(
-            f"\n  {_DIM}Ranked by: completed without a failed step, then fewest "
-            f"destructive/blocked commands, then total time.{_RESET}\n"
+            f"\n  {_DIM}Ranked by: ended in a working state, then fewest "
+            f"destructive/blocked commands, then fewest files deleted, then total time.\n"
+            f"  Lines marked ! are heuristics for your attention and do not affect "
+            f"rank.{_RESET}\n"
         )
 
     if args.html:

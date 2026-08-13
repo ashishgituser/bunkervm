@@ -50,12 +50,18 @@ _MAX_OUTPUT = 65536
 # step's trace is dominated by the namespace pickle rewriting itself.
 _TRACE_EXCLUDE_NAMES = {"_ns.pkl", "_code.py", "_runner.py", "_run.sh", "_run.js"}
 
+# Interpreter and test-runner caches. These are written by the toolchain, not
+# chosen by whatever is driving the sandbox, and they swamp the file counts —
+# a single `pytest` run can "create" a dozen files the agent never touched.
+_TRACE_EXCLUDE_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".git"}
+
 
 def _snapshot_dir(root: str) -> dict:
     """Walk a directory and record {real_path: (mtime, size)} for every file,
-    skipping BunkerVM's own control files."""
+    skipping BunkerVM's own control files and toolchain caches."""
     snapshot = {}
-    for dirpath, _dirnames, filenames in os.walk(root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _TRACE_EXCLUDE_DIRS]
         for fname in filenames:
             if fname in _TRACE_EXCLUDE_NAMES:
                 continue

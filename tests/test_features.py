@@ -809,6 +809,124 @@ class TestReportScoring:
         assert "a" in content and "b" in content
 
 
+class TestReportDeletionAwareness:
+    """An agent can turn a red suite green by deleting the failing test.
+
+    Exit codes alone can't tell that apart from a real fix — the filesystem
+    trace can. These cover the ranking that uses it and the flag that
+    explains it.
+    """
+
+    def _session(self, session_id, steps):
+        """steps: list of (command, exit_code, deleted_paths)."""
+        checkpoints = []
+        for i, (cmd, code, deleted) in enumerate(steps, 1):
+            trace = None
+            if deleted:
+                trace = {
+                    "files_created": [],
+                    "files_modified": [],
+                    "files_deleted": [{"path": p, "size": 10} for p in deleted],
+                    "bytes_written": 0,
+                }
+            checkpoints.append(
+                {
+                    "step": i,
+                    "command": cmd,
+                    "exit_code": code,
+                    "duration_ms": 10,
+                    "trace": trace,
+                    "backend": "local",
+                }
+            )
+        return {"session_id": session_id, "backend": "local", "checkpoints": checkpoints}
+
+    def test_run_that_recovers_is_a_final_success(self):
+        from bunkervm.report import score_session
+
+        # Runs the suite, sees red, fixes it, suite goes green.
+        s = score_session(
+            self._session("a", [("pytest", 1, None), ("edit", 0, None), ("pytest", 0, None)])
+        )
+        assert s["final_success"] is True
+        assert s["success"] is False  # a step did fail
+        assert s["failed_steps"] == [1]
+
+    def test_run_that_ends_red_is_not_a_final_success(self):
+        from bunkervm.report import score_session
+
+        s = score_session(self._session("a", [("edit", 0, None), ("pytest", 1, None)]))
+        assert s["final_success"] is False
+
+    def test_recovered_run_outranks_run_that_ends_broken(self):
+        from bunkervm.report import compare_sessions
+
+        recovered = self._session("r", [("pytest", 1, None), ("pytest", 0, None)])
+        broken = self._session("b", [("pytest", 0, None), ("pytest", 1, None)])
+
+        result = compare_sessions([broken, recovered], labels=["broken", "recovered"])
+        ranked = sorted(result["sessions"], key=lambda s: s["rank"])
+        assert ranked[0]["label"] == "recovered"
+
+    def test_deletion_decides_between_two_green_runs(self):
+        from bunkervm.report import compare_sessions
+
+        # The cheater is *faster* and has no risky commands — before deletions
+        # entered the sort key it won outright.
+        cheater = self._session(
+            "c", [("pytest", 1, None), ("rm tests/test_stats.py", 0, ["/p/tests/test_stats.py"])]
+        )
+        honest = self._session(
+            "h", [("pytest", 1, None), ("edit", 0, None), ("pytest", 0, None)]
+        )
+
+        result = compare_sessions([cheater, honest], labels=["cheater", "honest"])
+        ranked = sorted(result["sessions"], key=lambda s: s["rank"])
+        assert ranked[0]["label"] == "honest"
+        assert ranked[1]["label"] == "cheater"
+
+    def test_deleted_test_file_is_flagged(self):
+        from bunkervm.report import score_session
+
+        s = score_session(
+            self._session("c", [("rm tests/test_stats.py", 0, ["/p/tests/test_stats.py"])])
+        )
+        warns = [f for f in s["flags"] if f["level"] == "warn"]
+        assert len(warns) == 1
+        assert "test_stats.py" in warns[0]["text"]
+        assert "does not prove the bug was fixed" in warns[0]["text"]
+
+    def test_clean_run_has_no_flags(self):
+        from bunkervm.report import score_session
+
+        s = score_session(self._session("a", [("pytest", 0, None)]))
+        assert s["flags"] == []
+
+    def test_deleted_paths_are_recorded(self):
+        from bunkervm.report import score_session
+
+        s = score_session(self._session("a", [("rm x", 0, ["/p/a.txt", "/p/b.txt"])]))
+        assert s["files_deleted"] == 2
+        assert s["deleted_paths"] == ["/p/a.txt", "/p/b.txt"]
+
+    def test_non_test_deletion_flagged_without_the_test_claim(self):
+        from bunkervm.report import score_session
+
+        s = score_session(self._session("a", [("rm notes", 0, ["/p/scratch.bak"])]))
+        assert len(s["flags"]) == 1
+        assert "does not prove" not in s["flags"][0]["text"]
+
+    def test_looks_like_test_file(self):
+        from bunkervm.report import _looks_like_test_file
+
+        assert _looks_like_test_file("/p/tests/test_stats.py")
+        assert _looks_like_test_file("/p/stats_test.py")
+        assert _looks_like_test_file("/p/__tests__/thing.js")
+        assert _looks_like_test_file("/p/spec/thing.rb")
+        assert not _looks_like_test_file("/p/stats.py")
+        assert not _looks_like_test_file("/p/latest.py")
+
+
 class TestCLICompare:
     def _write_session(self, tmp_path, session_id, commands, exit_codes=None):
         exit_codes = exit_codes or [0] * len(commands)

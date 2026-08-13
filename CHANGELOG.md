@@ -4,6 +4,22 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-08-13
+
+The theme: an agent can turn a failing test suite green by deleting the test. Exit codes can't tell that apart from a real fix — the filesystem trace can, and `compare` now uses it.
+
+### Added
+- `examples/agent-bakeoff/` — a runnable example built around exactly that failure. One project with a real bug (`average([])` divides by zero), three agents told to make the suite pass, all three ending green with exit code 0. Uses the `local` backend, so it needs no API key and no KVM. `docs/bakeoff-example.html` is the rendered report; `docs/bakeoff.mp4` / `docs/bakeoff.gif` are the demo video.
+- `score_session()` now returns `deleted_paths` and `flags`. Flags are labelled heuristics for a human reader — "ended green after deleting `tests/test_stats.py`" — and are shown in both the CLI and the HTML report. They **never** affect ranking; that stays on observed facts only.
+- `score_session()` returns `final_success` alongside `success` (see Changed).
+
+### Changed
+- **Ranking now counts deleted files** (after failed steps and destructive/blocked commands, before duration). Previously `files_deleted` was computed and then ignored by the sort key, so an agent that deleted the failing test ranked *first* — it was fast and ran nothing risky. Caught by building the bake-off example and running it.
+- **`success` split into two signals.** `success` still means "no step ever failed"; the new `final_success` means "the run ended in a working state", and ranking uses that. The old definition punished the correct behaviour of running the suite first to see it red. The result column now reads `ended green`, `ended green (recovered from 1 failing step)`, or `ended failing (step N)`.
+- `bunkervm compare` text output now prints the full risk profile (`read x1  write x3  system x1`), not just a destructive/blocked count. A `system`-tier command like `chmod` or `pip install` was previously visible only in the HTML report.
+- Local-backend filesystem traces now skip `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache` and `.git`. These are written by the toolchain rather than chosen by the agent, and a single `pytest` run was inflating a step to "+9 files created".
+- `docs/compare-example.html` regenerated against the new scoring.
+
 ## [0.11.1] — 2026-08-12
 
 ### Added
