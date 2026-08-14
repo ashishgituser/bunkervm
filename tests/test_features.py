@@ -14,7 +14,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ── Snapshot Module Tests ──
 
 
@@ -98,7 +97,12 @@ class TestSnapshotManager:
             f.write(b"rootfs")
         with open(os.path.join(snap_dir, "meta.json"), "w") as f:
             json.dump(
-                {"name": "test-snap", "created_at": time.time(), "vcpu_count": 2, "mem_size_mib": 1024},
+                {
+                    "name": "test-snap",
+                    "created_at": time.time(),
+                    "vcpu_count": 2,
+                    "mem_size_mib": 1024,
+                },
                 f,
             )
 
@@ -168,6 +172,7 @@ class TestFilesystemTrace:
 
     def test_snapshot_and_diff(self, tmp_path):
         """Test snapshot/diff logic with real files."""
+
         # Replicate the logic from exec_agent
         def snapshot_dir(base):
             result = {}
@@ -279,7 +284,9 @@ class TestSandboxRecording:
         sb._vm = None
 
         for i in range(5):
-            sb._auto_checkpoint(f"cmd_{i}", {"exit_code": 0, "stdout": f"out_{i}", "duration_ms": i * 10})
+            sb._auto_checkpoint(
+                f"cmd_{i}", {"exit_code": 0, "stdout": f"out_{i}", "duration_ms": i * 10}
+            )
 
         assert len(sb.history()) == 5
         assert sb._step_counter == 5
@@ -317,23 +324,25 @@ class TestCLIReplay:
         """Helper to create a test session JSON file."""
         checkpoints = []
         for i in range(1, steps + 1):
-            checkpoints.append({
-                "step": i,
-                "timestamp": time.time(),
-                "command": f"echo step{i}",
-                "exit_code": 0,
-                "stdout": f"step{i}\n",
-                "stderr": "",
-                "duration_ms": i * 10,
-                "trace": {
-                    "files_created": [{"path": f"/root/file{i}.txt", "size": 100}],
-                    "files_modified": [],
-                    "files_deleted": [],
-                    "files_read": [],
-                    "bytes_written": 100,
-                },
-                "snapshot_name": f"{session_id}-step{i}",
-            })
+            checkpoints.append(
+                {
+                    "step": i,
+                    "timestamp": time.time(),
+                    "command": f"echo step{i}",
+                    "exit_code": 0,
+                    "stdout": f"step{i}\n",
+                    "stderr": "",
+                    "duration_ms": i * 10,
+                    "trace": {
+                        "files_created": [{"path": f"/root/file{i}.txt", "size": 100}],
+                        "files_modified": [],
+                        "files_deleted": [],
+                        "files_read": [],
+                        "bytes_written": 100,
+                    },
+                    "snapshot_name": f"{session_id}-step{i}",
+                }
+            )
 
         session = {
             "session_id": session_id,
@@ -421,17 +430,19 @@ class TestAgentDiff:
             trace = None
             if traces and i - 1 < len(traces):
                 trace = traces[i - 1]
-            checkpoints.append({
-                "step": i,
-                "timestamp": time.time(),
-                "command": cmd,
-                "exit_code": 0,
-                "stdout": f"output_{i}\n",
-                "stderr": "",
-                "duration_ms": i * 15,
-                "trace": trace,
-                "snapshot_name": None,
-            })
+            checkpoints.append(
+                {
+                    "step": i,
+                    "timestamp": time.time(),
+                    "command": cmd,
+                    "exit_code": 0,
+                    "stdout": f"output_{i}\n",
+                    "stderr": "",
+                    "duration_ms": i * 15,
+                    "trace": trace,
+                    "snapshot_name": None,
+                }
+            )
         return {
             "session_id": session_id,
             "created_at": time.time(),
@@ -637,15 +648,18 @@ class TestLocalClientExec:
 
         client = LocalClient(root=str(tmp_path))
         client.write_file("/tmp/_ns.pkl", "pretend-namespace-bytes")
-        client.write_file("/tmp/t.py", "open('/tmp/real_output.txt', 'w').write('x')" .replace("/tmp/", ""))
+        client.write_file(
+            "/tmp/t.py", "open('/tmp/real_output.txt', 'w').write('x')".replace("/tmp/", "")
+        )
         # Rewrite _ns.pkl during exec, same way the persistent runner does
-        client.write_file("/tmp/t.py", "import os; f=open('_ns.pkl','w'); f.write('changed'); f.close()")
+        client.write_file(
+            "/tmp/t.py", "import os; f=open('_ns.pkl','w'); f.write('changed'); f.close()"
+        )
         result = client.exec("python3 /tmp/t.py", timeout=10, workdir="/tmp", trace=True)
         assert result["exit_code"] == 0
-        touched = (
-            [f["path"] for f in result["trace"]["files_created"]]
-            + [f["path"] for f in result["trace"]["files_modified"]]
-        )
+        touched = [f["path"] for f in result["trace"]["files_created"]] + [
+            f["path"] for f in result["trace"]["files_modified"]
+        ]
         assert not any("_ns.pkl" in p for p in touched)
 
     def test_exec_nonzero_exit(self, tmp_path):
@@ -992,7 +1006,7 @@ class TestWatchAnalysis:
         from bunkervm.watch import analyze
 
         cmd = (
-            'cd /tmp/x && python - <<\'PY\'\n'
+            "cd /tmp/x && python - <<'PY'\n"
             'send("Bash",{"command":"rm -rf node_modules"},"")\n'
             'send("Bash",{"command":"rm src/__tests__/auth.test.js"},"")\n'
             "PY"
@@ -1006,7 +1020,12 @@ class TestWatchAnalysis:
         assert analyze([self._ev("Bash", command="echo 'how to rm files'")])["deletions"] == []
         assert analyze([self._ev("Bash", command="grep -rn rm src/")])["deletions"] == []
         # Actually executed, in several shapes.
-        for cmd in ("rm notes.txt", "cd src && rm notes.txt", "true; rm notes.txt", "true\nrm notes.txt"):
+        for cmd in (
+            "rm notes.txt",
+            "cd src && rm notes.txt",
+            "true; rm notes.txt",
+            "true\nrm notes.txt",
+        ):
             assert [d["path"] for d in analyze([self._ev("Bash", command=cmd)])["deletions"]] == [
                 "notes.txt"
             ], cmd
@@ -1046,7 +1065,9 @@ class TestWatchAnalysis:
     def test_flag_text_never_embeds_a_whole_multiline_command(self):
         from bunkervm.watch import analyze
 
-        long_cmd = 'pip install cairosvg -q 2>&1 | tail -3; python -c "\nimport cairosvg\nprint(1)\n"'
+        long_cmd = (
+            'pip install cairosvg -q 2>&1 | tail -3; python -c "\nimport cairosvg\nprint(1)\n"'
+        )
         a = analyze([self._ev("Bash", command=long_cmd)])
         text = a["flags"][0]["text"]
         assert "\n" not in text
@@ -1305,9 +1326,7 @@ class TestReportDeletionAwareness:
         cheater = self._session(
             "c", [("pytest", 1, None), ("rm tests/test_stats.py", 0, ["/p/tests/test_stats.py"])]
         )
-        honest = self._session(
-            "h", [("pytest", 1, None), ("edit", 0, None), ("pytest", 0, None)]
-        )
+        honest = self._session("h", [("pytest", 1, None), ("edit", 0, None), ("pytest", 0, None)])
 
         result = compare_sessions([cheater, honest], labels=["cheater", "honest"])
         ranked = sorted(result["sessions"], key=lambda s: s["rank"])
@@ -1356,6 +1375,153 @@ class TestReportDeletionAwareness:
         assert not _looks_like_test_file("/p/latest.py")
 
 
+class TestWatchInstallTargets:
+    def test_extracts_package_names(self):
+        from bunkervm.watch import install_targets
+
+        assert install_targets("pip install requests") == ["requests"]
+        assert install_targets("npm install lodash") == ["lodash"]
+        assert install_targets("pip install black ruff") == ["black", "ruff"]
+        assert install_targets("uv pip install httpx") == ["httpx"]
+        assert install_targets("yarn add react") == ["react"]
+
+    def test_flags_are_not_packages(self):
+        from bunkervm.watch import install_targets
+
+        assert install_targets("pip install -q --no-cache-dir requests") == ["requests"]
+
+    def test_requirements_file_is_the_useful_target(self):
+        from bunkervm.watch import install_targets
+
+        assert install_targets("pip install -r requirements.txt") == ["requirements.txt"]
+        assert install_targets("pip install -e .") == ["."]
+
+    def test_location_flag_values_are_not_packages(self):
+        from bunkervm.watch import install_targets
+
+        assert install_targets("pip install --target ./vendor requests") == ["requests"]
+
+    def test_lockfile_restore_names_nothing(self):
+        from bunkervm.watch import install_targets
+
+        assert install_targets("npm install") == []
+
+    def test_non_install_statements(self):
+        from bunkervm.watch import install_targets
+
+        assert install_targets("pytest -q") == []
+        assert install_targets("echo pip install requests") == []
+
+
+class TestWatchEditLineCapture:
+    def test_records_the_line_an_edit_landed_on(self, tmp_path):
+        from bunkervm.watch import _event_line
+
+        f = tmp_path / "auth.js"
+        f.write_text("function login() {\n  return false;\n}\n", encoding="utf-8")
+        line = _event_line(
+            "Edit",
+            {"file_path": str(f), "old_string": "return false;", "new_string": "return false;"},
+        )
+        assert line == 2
+
+    def test_write_reports_line_one(self, tmp_path):
+        from bunkervm.watch import _event_line
+
+        f = tmp_path / "new.py"
+        f.write_text("x = 1\n", encoding="utf-8")
+        assert _event_line("Write", {"file_path": str(f)}) == 1
+
+    def test_missing_file_is_not_an_error(self):
+        from bunkervm.watch import _event_line
+
+        assert _event_line("Edit", {"file_path": "/nope/gone.py", "new_string": "x"}) is None
+
+    def test_bash_events_have_no_line(self):
+        from bunkervm.watch import _event_line
+
+        assert _event_line("Bash", {"command": "ls"}) is None
+
+
+class TestReviewTables:
+    def test_truncate_cell_collapses_newlines(self):
+        from bunkervm.cli import _truncate_cell
+
+        assert _truncate_cell("a\nb", 10) == "a b"
+        assert _truncate_cell(None, 10) == ""
+        assert len(_truncate_cell("x" * 50, 20)) == 20
+
+    def test_table_aligns_and_rules(self, capsys):
+        from bunkervm.cli import _print_table
+
+        _print_table(["A", "B"], [["1", "longer"], ["22", "x"]], [10, 10])
+        out = capsys.readouterr().err.splitlines()
+        assert out[0].startswith("A  | B")
+        assert set(out[1]) <= {"-", "+"}
+        assert len(out) == 4
+
+    def test_findings_columns_are_all_populated(self):
+        """Every column has to carry information — a column that is always "-"
+        is noise, which is why Findings has no Line column."""
+        from bunkervm import watch as w
+        from bunkervm.cli import _review_findings
+
+        a = {
+            "deletions": [{"path": "tests/test_auth.py", "command": "rm tests/test_auth.py"}],
+            "installs": ["npm install lodash"],
+            "flags": [
+                {
+                    "level": "warn",
+                    "text": "test count dropped: 12 -> 9 (3 fewer) running `npm test`",
+                }
+            ],
+        }
+        rows = _review_findings(a, w)
+        assert len(rows) == 3
+        assert rows[0] == ["WARN", "delete", "tests/test_auth.py", "rm tests/test_auth.py"]
+        assert rows[1][:3] == ["INFO", "install", "lodash"]
+        assert rows[2][:3] == ["WARN", "tests", "npm test"]
+        for row in rows:
+            assert all(str(cell).strip() not in ("", "-") for cell in row), row
+
+    def test_summary_flags_are_not_duplicated_as_rows(self):
+        from bunkervm import watch as w
+        from bunkervm.cli import _review_findings
+
+        a = {
+            "deletions": [{"path": "a.py", "command": "rm a.py"}],
+            "installs": [],
+            "flags": [{"level": "warn", "text": "deleted: a.py"}],
+        }
+        assert len(_review_findings(a, w)) == 1
+
+
+class TestCLIReviewCommandsFlag:
+    """`--commands` was referenced by cmd_review via getattr but never added to
+    the parser, so the entire Commands table was unreachable dead code."""
+
+    def _exit_code(self, argv, tmp_path):
+        import sys
+        from unittest.mock import patch
+
+        from bunkervm.cli import main
+
+        with patch.object(sys, "argv", argv + ["--path", str(tmp_path)]):
+            try:
+                return main()
+            except SystemExit as e:
+                return e.code
+
+    def test_commands_flag_parses(self, tmp_path):
+        # 2 is argparse's "unrecognized argument". Anything else means it parsed
+        # and reached cmd_review (which returns 1 for "no sessions here").
+        assert self._exit_code(["bunkervm", "review", "--commands"], tmp_path) != 2
+
+    def test_an_unregistered_flag_still_fails(self, tmp_path):
+        # Proves the assertion above is actually discriminating.
+        assert self._exit_code(["bunkervm", "review", "--nope"], tmp_path) == 2
+
+
 class TestCLICompare:
     def _write_session(self, tmp_path, session_id, commands, exit_codes=None):
         exit_codes = exit_codes or [0] * len(commands)
@@ -1370,7 +1536,12 @@ class TestCLICompare:
             }
             for i, (cmd, code) in enumerate(zip(commands, exit_codes), 1)
         ]
-        session = {"session_id": session_id, "backend": "local", "total_steps": len(commands), "checkpoints": checkpoints}
+        session = {
+            "session_id": session_id,
+            "backend": "local",
+            "total_steps": len(commands),
+            "checkpoints": checkpoints,
+        }
         path = tmp_path / f"{session_id}.json"
         with open(path, "w") as f:
             json.dump(session, f)

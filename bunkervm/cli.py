@@ -34,6 +34,7 @@ import json
 import os
 import sys
 import time
+from typing import Optional
 
 # ANSI colors for terminal output
 _BOLD = "\033[1m"
@@ -1437,6 +1438,152 @@ def cmd_hook(args: argparse.Namespace) -> int:
     return 0
 
 
+def _truncate_cell(value, width: int) -> str:
+    text = "" if value is None else str(value).replace("\r", " ").replace("\n", " ")
+    text = " ".join(text.split())
+    if len(text) <= width:
+        return text
+    if width <= 3:
+        return text[:width]
+    return text[: width - 3].rstrip() + "..."
+
+
+def _print_table(
+    headers: list[str], rows: list[list], max_widths: Optional[list[int]] = None
+) -> None:
+    if not rows:
+        return
+    max_widths = max_widths or [80] * len(headers)
+    string_rows = [
+        [_truncate_cell(cell, max_widths[i]) for i, cell in enumerate(row)] for row in rows
+    ]
+    widths = []
+    for i, header in enumerate(headers):
+        values = [row[i] for row in string_rows]
+        widths.append(min(max(len(header), *(len(v) for v in values)), max_widths[i]))
+
+    def fmt(row: list[str]) -> str:
+        return " | ".join(row[i].ljust(widths[i]) for i in range(len(headers)))
+
+    _print(fmt(headers))
+    _print("-+-".join("-" * w for w in widths))
+    for row in string_rows:
+        _print(fmt(row))
+
+
+def _rel_to_project(path: str, project: str) -> str:
+    if not path:
+        return "-"
+    try:
+        return os.path.relpath(path, project) if os.path.isabs(path) else path
+    except ValueError:
+        return path
+
+
+def _finding_target(text: str, w) -> str:
+    """The thing a flag is about, pulled back out of its own wording.
+
+    The test flags name their command inline (…running `npm test`), so the
+    column can be filled rather than left as a placeholder.
+    """
+    start = text.find("`")
+    end = text.find("`", start + 1)
+    if start != -1 and end != -1:
+        return text[start + 1 : end]
+    return "-"
+
+
+def _review_findings(a: dict, w) -> list[list]:
+    """Rows for the Findings table.
+
+    No Line column here on purpose: a finding is about a deleted file, an
+    installed package or a whole test run, none of which have a line to point
+    at. Line belongs to Files Changed, where it is always populated.
+    """
+    rows = []
+    for d in a["deletions"]:
+        rows.append(["WARN", "delete", d["path"], d["command"]])
+
+    for install in a["installs"]:
+        packages = w.install_targets(install)
+        target = ", ".join(packages) if packages else "(lockfile restore)"
+        rows.append(["INFO", "install", target, install])
+
+    for f in a["flags"]:
+        text = f["text"]
+        # Deletions and installs already have their own rows above, with a
+        # real target; the flag forms of them are summaries of those.
+        if text.startswith("deleted:") or text.startswith("installed "):
+            continue
+        severity = "WARN" if f["level"] == "warn" else "INFO"
+        impact = "tests" if "test" in text.lower() or "skipped" in text.lower() else "note"
+        rows.append([severity, impact, _finding_target(text, w), text])
+    return rows
+
+
+def _command_impact(event: dict, w) -> tuple[str, str]:
+    command = event.get("command", "")
+    result = w.parse_test_result(event.get("output", ""))
+    if result:
+        silenced = f", {result['silenced']} silenced" if result["silenced"] else ""
+        return "tests", f"{result['total']} total, {result['passed']} passed{silenced}"
+
+    installs = []
+    deletes = []
+    for statement in w._raw_shell_statements(command):
+        if w._is_install_statement(statement):
+            installs.append(w.short_cmd(statement, 42))
+        for target in w._rm_targets(statement):
+            path = target.strip("'\"")
+            if path and not w._NOT_A_PATH.search(path) and not w._is_noise_deletion(path):
+                deletes.append(path)
+    if deletes:
+        return "delete", ", ".join(deletes[:3]) + (
+            f" (+{len(deletes) - 3})" if len(deletes) > 3 else ""
+        )
+    if installs:
+        return "install", installs[0] + (f" (+{len(installs) - 1})" if len(installs) > 1 else "")
+    return "run", "-"
+
+
+def _review_command_rows(events: list[dict], w) -> list[list]:
+    rows = []
+    n = 0
+    for e in events:
+        if e.get("tool") != "Bash" or not e.get("command"):
+            continue
+        n += 1
+        impact, target = _command_impact(e, w)
+        rows.append([n, impact, target, w.short_cmd(e["command"], 96)])
+    return rows
+
+
+def _review_file_rows(events: list[dict], project: str) -> list[list]:
+    rows = []
+    seen = set()
+    n = 0
+    for e in events:
+        if e.get("tool") not in ("Edit", "Write", "NotebookEdit"):
+            continue
+        path = e.get("file_path") or "-"
+        key = (path, e.get("line"))
+        if key in seen:
+            continue
+        seen.add(key)
+        n += 1
+        line = e.get("line") or "-"
+        rows.append(
+            [
+                n,
+                e.get("tool", "edit"),
+                _rel_to_project(path, project),
+                line,
+                e.get("description") or "-",
+            ]
+        )
+    return rows
+
+
 def cmd_review(args: argparse.Namespace) -> int:
     """Summarize what an agent actually did during a recorded session."""
     from . import watch as w
@@ -1478,6 +1625,15 @@ def cmd_review(args: argparse.Namespace) -> int:
         print(json.dumps(a, indent=2, default=str))
         return 0
 
+    if getattr(args, "commands", False):
+        _print(
+            f"\n{_BOLD}Commands {sid[:8]}{_RESET}  {_DIM}{a['commands']} Bash commands{_RESET}\n"
+        )
+        rows = _review_command_rows(events, w)
+        _print_table(["No", "Impact", "Target / Result", "Command"], rows, [4, 10, 36, 96])
+        _print()
+        return 0
+
     def _n(count: int, word: str) -> str:
         return f"{count} {word}" if count == 1 else f"{count} {word}s"
 
@@ -1487,10 +1643,15 @@ def cmd_review(args: argparse.Namespace) -> int:
     )
     _print()
 
-    for f in a["flags"]:
-        colour = _YELLOW if f["level"] == "warn" else _DIM
-        _print(f"  {colour}! {f['text']}{_RESET}")
-    if not a["flags"]:
+    findings = _review_findings(a, w)
+    if findings:
+        _print(f"{_BOLD}Findings{_RESET}")
+        _print_table(
+            ["Level", "Impact", "Target", "Evidence"],
+            findings,
+            [6, 10, 36, 80],
+        )
+    else:
         _print(f"  {_GREEN}{_CHECK} Nothing worth flagging.{_RESET}")
     _print()
 
@@ -1505,12 +1666,17 @@ def cmd_review(args: argparse.Namespace) -> int:
             f"{_DIM}tests in last run:{_RESET} {last['total']}"
         )
 
-    if a["files"]:
-        _print(f"  {_DIM}files edited:{_RESET} {len(a['files'])}")
-        for p in a["files"][:8]:
-            _print(f"      {os.path.relpath(p, project) if os.path.isabs(p) else p}")
-        if len(a["files"]) > 8:
-            _print(f"      {_DIM}... and {len(a['files']) - 8} more{_RESET}")
+    file_rows = _review_file_rows(events, project)
+    if file_rows:
+        _print()
+        _print(f"{_BOLD}Files Changed{_RESET}")
+        _print_table(["No", "Tool", "File", "Line", "Description"], file_rows, [4, 12, 44, 6, 48])
+
+    if a["commands"]:
+        _print()
+        _print(
+            f"{_DIM}Show all commands:{_RESET} {_CYAN}bunkervm review {sid[:8]} --commands{_RESET}"
+        )
     _print()
     return 0
 
@@ -1733,6 +1899,11 @@ examples:
     review_p.add_argument("session", nargs="?", help="Session ID prefix (default: most recent)")
     review_p.add_argument("--path", help="Project directory (default: cwd)")
     review_p.add_argument("--list", action="store_true", help="List recorded sessions")
+    review_p.add_argument(
+        "--commands",
+        action="store_true",
+        help="Show every Bash command the agent ran, as a table",
+    )
     review_p.add_argument(
         "--format", choices=["text", "json"], default="text", help="Output format (default: text)"
     )

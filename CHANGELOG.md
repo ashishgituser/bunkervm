@@ -6,7 +6,16 @@ All notable changes to BunkerVM are documented here.
 
 ## [0.13.2] — 2026-08-14
 
+### Added
+- **`bunkervm review` output is now tabular.** Findings (level / impact / target / evidence) and Files Changed (tool / file / line / description) render as aligned tables instead of a bullet list, so a long session is scannable rather than a wall of prose.
+- **Edits record the line they landed on.** `Files Changed` points at a line number, resolved by locating the edit's `new_string` in the file (falling back to `old_string`, then to the first non-empty line of the edit when indentation shifted).
+- **`bunkervm review --commands`** — every Bash command the agent ran, with what each one did: test totals for test runs, deleted paths for deletions, package names for installs.
+- `watch.install_targets()` extracts package names from an install statement using the same shell tokenizer as delete detection, so `pip install -q --no-cache-dir requests` reports `requests` and `pip install -r requirements.txt` reports `requirements.txt`. A bare `npm install` (lockfile restore) reports nothing rather than guessing.
+
 ### Fixed
+- `bunkervm/__init__.py` still declared `0.13.1` while `pyproject.toml` declared `0.13.2`, so `bunkervm.__version__` disagreed with the installed distribution version.
+- `bunkervm review --commands` was read by `cmd_review` but never registered on the argument parser, so the flag errored out and the entire commands table was unreachable.
+- The Findings table had a `Line` column that was structurally always empty — a finding concerns a deleted file, an installed package or a whole test run, none of which have a line. Removed there, kept in Files Changed where it is always populated. `Target` is now filled for install and test findings instead of showing a placeholder.
 - **`bunkervm review` now handles messy real agent commands instead of only tidy one-liners.** Test-run parsing now only considers Bash events with commands, so an Edit/Write event whose output mentions `skipped` no longer inflates the test-run count or produces a warning attributed to an empty command.
 
   Delete detection now scans only the actual shell prefix before heredoc source and only treats `rm` as a command invocation, not as text inside embedded Python, `echo`, or `grep`. Multi-line commands are split at unquoted shell statement separators, so install warnings report the install statement instead of dumping an entire `pip install ...; python -c ...` blob into the flag.

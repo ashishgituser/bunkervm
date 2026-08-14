@@ -181,6 +181,45 @@ def _response_text(tool_response) -> str:
     return "" if tool_response is None else str(tool_response)
 
 
+def _line_number(path: str, needle: str) -> Optional[int]:
+    if not path or not needle or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            text = f.read()
+    except OSError:
+        return None
+
+    idx = text.find(needle)
+    if idx == -1:
+        # Multi-line edits often have changed indentation or surrounding
+        # context. The first non-empty new line is still a useful anchor.
+        for line in needle.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            idx = text.find(line)
+            if idx != -1:
+                break
+    if idx == -1:
+        return None
+    return text.count("\n", 0, idx) + 1
+
+
+def _event_line(tool: str, tool_input: dict) -> Optional[int]:
+    path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
+    if not path:
+        return None
+    if tool == "Write":
+        return 1
+    if tool == "Edit":
+        line = _line_number(path, tool_input.get("new_string", ""))
+        if line is not None:
+            return line
+        return _line_number(path, tool_input.get("old_string", ""))
+    return None
+
+
 def record_event(payload: dict) -> Optional[str]:
     """Append one hook payload to the session log. Returns the log path.
 
@@ -196,6 +235,7 @@ def record_event(payload: dict) -> Optional[str]:
         "tool": payload.get("tool_name", ""),
         "command": tool_input.get("command", ""),
         "file_path": tool_input.get("file_path", ""),
+        "line": _event_line(payload.get("tool_name", ""), tool_input),
         "description": tool_input.get("description", ""),
         "output": _response_text(payload.get("tool_response"))[:_MAX_OUTPUT],
         "agent_type": payload.get("agent_type", ""),
@@ -419,6 +459,40 @@ def _rm_targets(statement: str) -> list[str]:
     return targets
 
 
+def install_targets(statement: str) -> list[str]:
+    """Package names an install statement names, if any.
+
+    Same tokenizer as `_rm_targets`, so `pip install -r req.txt` reports the
+    requirements file rather than the flag, and quoting is handled once.
+    Returns [] for an install with no explicit package (`npm install`), which
+    is a lockfile restore rather than a new dependency.
+    """
+    if not _is_install_statement(statement):
+        return []
+    tokens = _shell_tokens(statement)
+    i = _command_start(tokens)
+
+    # Step past the install verb itself: "pip install", "uv pip install".
+    i += 2 if tokens[i].lower() != "uv" else 3
+
+    # Flags whose value is a location, not something being installed.
+    takes_non_package_value = {"-t", "--target", "--index-url", "-i", "--extra-index-url", "-d"}
+
+    targets = []
+    skip_next = False
+    for token in tokens[i:]:
+        if skip_next:
+            skip_next = False
+            continue
+        if token in takes_non_package_value:
+            skip_next = True
+            continue
+        if token.startswith("-"):
+            continue  # -r/-e keep their value: that file or path is the answer
+        targets.append(token)
+    return targets
+
+
 def short_cmd(command: str, limit: int = 60) -> str:
     """One-line, length-capped form of a command, for flag text.
 
@@ -427,6 +501,7 @@ def short_cmd(command: str, limit: int = 60) -> str:
     """
     first = command.strip().splitlines()[0].strip() if command.strip() else ""
     return first if len(first) <= limit else first[: limit - 3].rstrip() + "..."
+
 
 # Deleting build output, caches and vendored deps is routine housekeeping. If
 # the deletion flag fires on `rm -rf node_modules` it becomes noise, and a flag
