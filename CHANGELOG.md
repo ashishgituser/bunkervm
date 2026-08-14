@@ -4,7 +4,7 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
-## [0.13.2] — 2026-08-14
+## [0.13.3] — 2026-08-14
 
 ### Added
 - **`bunkervm review` output is now tabular.** Findings (level / impact / target / evidence) and Files Changed (tool / file / line / description) render as aligned tables instead of a bullet list, so a long session is scannable rather than a wall of prose.
@@ -16,6 +16,10 @@ All notable changes to BunkerVM are documented here.
 - `bunkervm/__init__.py` still declared `0.13.1` while `pyproject.toml` declared `0.13.2`, so `bunkervm.__version__` disagreed with the installed distribution version.
 - `bunkervm review --commands` was read by `cmd_review` but never registered on the argument parser, so the flag errored out and the entire commands table was unreachable.
 - The Findings table had a `Line` column that was structurally always empty — a finding concerns a deleted file, an installed package or a whole test run, none of which have a line. Removed there, kept in Files Changed where it is always populated. `Target` is now filled for install and test findings instead of showing a placeholder.
+
+## [0.13.2] — 2026-08-14
+
+### Fixed
 - **`bunkervm review` now handles messy real agent commands instead of only tidy one-liners.** Test-run parsing now only considers Bash events with commands, so an Edit/Write event whose output mentions `skipped` no longer inflates the test-run count or produces a warning attributed to an empty command.
 
   Delete detection now scans only the actual shell prefix before heredoc source and only treats `rm` as a command invocation, not as text inside embedded Python, `echo`, or `grep`. Multi-line commands are split at unquoted shell statement separators, so install warnings report the install statement instead of dumping an entire `pip install ...; python -c ...` blob into the flag.
