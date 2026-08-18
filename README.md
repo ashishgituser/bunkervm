@@ -29,7 +29,9 @@ That's a real run: three commands mutate `x` to `1100`, one line rewinds the san
 
 ## Is this for you?
 
-If you're building with LangChain, LangGraph, the OpenAI Agents SDK, or an MCP client like Claude Desktop or VS Code Copilot, and you've ever stared at an agent that did fifteen things and failed, with zero visibility into what happened or a way back to before it broke — yes. BunkerVM gives every sandboxed run a rewind button and a diff tool, on your own machine, for free.
+If you've ever stared at an agent that did fifteen things and failed, with zero visibility into what happened or a way back to before it broke — yes. BunkerVM gives every sandboxed run a rewind button and a diff tool, on your own machine, for free.
+
+It works through MCP (Claude Desktop, VS Code Copilot, any MCP client), through the CLI, or as a plain Python API. There are single-tool adapters for LangChain and the OpenAI Agents SDK if you want one — see [Integrations](#integrations).
 
 If you need managed infrastructure for thousands of concurrent sandboxes, this isn't that — see [Why not E2B / Daytona / Modal?](#why-not-e2b--daytona--modal) below.
 
@@ -330,6 +332,8 @@ Those are hosted sandbox platforms — good at giving your agent a place to run.
 | Cost | Free, open source | Usage-billed |
 
 Trade-off: it won't scale to thousands of concurrent sandboxes the way a hosted platform will. If you need managed multi-tenant infra, use one of those. If you need to see exactly what your agent did and rewind to before it broke, that's what this is for — with real hardware isolation where your machine supports it (`/dev/kvm` or WSL2), or the same record/rewind/diff workflow with no isolation anywhere else, including macOS.
+
+One consequence worth stating plainly: **BunkerVM cannot be shipped as a Docker image.** Firecracker needs `/dev/kvm`, so there is no `docker run` one-liner and no hosted build a registry can verify by executing. That is the same property that makes the isolation real — a sandbox you can run inside a container is sharing that container's kernel. Install it with `pip`, run it on hardware.
 
 ---
 
