@@ -4,6 +4,13 @@ All notable changes to BunkerVM are documented here.
 
 ## [Unreleased]
 
+## [0.13.4] — 2026-08-18
+
+### Fixed
+- **The MCP server was broken on every fresh install.** The `mcp` dependency was unbounded (`mcp>=1.0.0`), and mcp 2.0.0 removed `mcp.server.fastmcp` in favour of a different `MCPServer` API. Anyone running `pip install bunkervm` resolved to 2.0.0 and got `ModuleNotFoundError: No module named 'mcp.server.fastmcp'` the moment they touched `bunkervm server` or imported `bunkervm.mcp_server`. Pinned to `mcp>=1.0.0,<2` until the code is ported to the 2.x API.
+
+  This had been shipping silently: nothing imported `mcp_server` during tests, so CI stayed green while the published package couldn't start its MCP server. It only surfaced because the new tool-annotation tests import the server for real.
+
 ## [0.13.3] — 2026-08-14
 
 ### Added
