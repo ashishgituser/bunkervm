@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://pypi.org/project/bunkervm/"><img src="https://img.shields.io/pypi/v/bunkervm?color=7c5cfc" alt="PyPI"></a>
   <a href="https://github.com/ashishgituser/bunkervm/actions/workflows/ci.yml"><img src="https://github.com/ashishgituser/bunkervm/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://m8ven.ai/mcp/ashishgituser-bunkervm-yshkwg"><img src="https://m8ven.ai/badge/mcp/ashishgituser-bunkervm-yshkwg?variant=verified" alt="M8ven Verified"></a>
   <a href="https://github.com/ashishgituser/bunkervm"><img src="https://img.shields.io/github/stars/ashishgituser/bunkervm?style=social" alt="Stars"></a>
   <img src="https://img.shields.io/badge/isolation-hardware%20(KVM)-22d3ee" alt="Isolation">
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">

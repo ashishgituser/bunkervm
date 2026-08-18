@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
 from .safety import classify_command, SafetyLevel
 
@@ -74,7 +75,15 @@ mcp = FastMCP(
 # ── Tool: Execute Command ──
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Execute code in sandbox",
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=False,
+        openWorldHint=True,
+    )
+)
 def sandbox_exec(
     command: str,
     timeout: int = 30,
@@ -188,7 +197,15 @@ def sandbox_exec(
 # ── Tool: Read File ──
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Read file from sandbox",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 def sandbox_read_file(path: str) -> str:
     """Read the contents of a file from the sandbox filesystem.
 
@@ -229,7 +246,15 @@ def sandbox_read_file(path: str) -> str:
 # ── Tool: Write File ──
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Write file in sandbox",
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=False,
+        openWorldHint=False,
+    )
+)
 def sandbox_write_file(path: str, content: str, append: bool = False) -> str:
     """Write content to a file in the sandbox filesystem.
 
@@ -266,7 +291,15 @@ def sandbox_write_file(path: str, content: str, append: bool = False) -> str:
 # ── Tool: List Directory ──
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List sandbox directory",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 def sandbox_list_dir(path: str = "/") -> str:
     """List the contents of a directory in the sandbox.
 
@@ -312,7 +345,15 @@ def sandbox_list_dir(path: str = "/") -> str:
 # ── Tool: Sandbox Status ──
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Sandbox status",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 def sandbox_status() -> str:
     """Get the current status of the sandbox VM.
 
@@ -380,7 +421,15 @@ def sandbox_status() -> str:
 # ── Tool: Reset Sandbox ──
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Upload file to sandbox",
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 def sandbox_upload_file(local_path: str, remote_path: str) -> str:
     """Upload a file from the host filesystem into the sandbox VM.
 
@@ -417,7 +466,15 @@ def sandbox_upload_file(local_path: str, remote_path: str) -> str:
     return f"Uploaded {local_path} -> {remote_path} ({size} bytes)"
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Download file from sandbox",
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 def sandbox_download_file(remote_path: str, local_path: str) -> str:
     """Download a file from the sandbox VM to the host filesystem.
 
@@ -454,7 +511,15 @@ def sandbox_download_file(remote_path: str, local_path: str) -> str:
     return f"Downloaded {remote_path} -> {local_path} ({len(data)} bytes)"
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Reset sandbox",
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 def sandbox_reset() -> str:
     """Reset the sandbox to a clean state.
 

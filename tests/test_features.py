@@ -1699,3 +1699,61 @@ class TestNewImports:
         # Should be 0.9.0 or higher
         assert int(parts[0]) >= 0
         assert int(parts[1]) >= 9
+
+
+class TestMCPToolAnnotations:
+    """Every MCP tool must declare all four annotation hints.
+
+    Hosts use these to warn before invoking — a sandbox that executes
+    arbitrary code and doesn't declare itself destructive is a real gap in a
+    tool that is sold on isolation. Naming each tool explicitly here also
+    means a new tool added without hints fails this suite rather than
+    shipping silently.
+    """
+
+    EXPECTED = {
+        # name: (readOnly, destructive, idempotent, openWorld)
+        "sandbox_exec": (False, True, False, True),
+        "sandbox_read_file": (True, False, True, False),
+        "sandbox_write_file": (False, True, False, False),
+        "sandbox_list_dir": (True, False, True, False),
+        "sandbox_status": (True, False, True, False),
+        "sandbox_upload_file": (False, True, True, False),
+        "sandbox_download_file": (False, True, True, False),
+        "sandbox_reset": (False, True, True, False),
+    }
+
+    def _tools(self):
+        import asyncio
+
+        from bunkervm.mcp_server import mcp
+
+        return {t.name: t for t in asyncio.run(mcp.list_tools())}
+
+    def test_every_tool_is_covered_by_this_test(self):
+        assert set(self._tools()) == set(self.EXPECTED)
+
+    def test_all_four_hints_are_explicit_booleans(self):
+        for name, tool in self._tools().items():
+            a = tool.annotations
+            assert a is not None, name
+            for hint in ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"):
+                assert isinstance(getattr(a, hint), bool), f"{name}.{hint}"
+
+    def test_hints_match_what_the_handler_does(self):
+        for name, tool in self._tools().items():
+            a = tool.annotations
+            expected = self.EXPECTED[name]
+            actual = (a.readOnlyHint, a.destructiveHint, a.idempotentHint, a.openWorldHint)
+            assert actual == expected, name
+
+    def test_exec_declares_itself_destructive(self):
+        a = self._tools()["sandbox_exec"].annotations
+        assert a.readOnlyHint is False
+        assert a.destructiveHint is True
+
+    def test_read_only_tools_are_not_destructive(self):
+        for name, tool in self._tools().items():
+            a = tool.annotations
+            if a.readOnlyHint:
+                assert a.destructiveHint is False, name
