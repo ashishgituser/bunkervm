@@ -1743,6 +1743,11 @@ examples:
     server_p = sub.add_parser("server", help="Start MCP server (full mode)")
     server_p.add_argument("--transport", choices=["stdio", "sse"], default="stdio")
     server_p.add_argument("--port", type=int, default=3000)
+    server_p.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Bind address for SSE/dashboard (default: 127.0.0.1, unauthenticated)",
+    )
     server_p.add_argument("--config", default=None)
     server_p.add_argument("--no-network", action="store_true")
     server_p.add_argument("--skip-vm", action="store_true")
@@ -1951,6 +1956,8 @@ def cmd_server(args: argparse.Namespace) -> int:
     new_argv.extend(["--transport", args.transport])
     if args.port != 3000:
         new_argv.extend(["--port", str(args.port)])
+    if getattr(args, "host", "127.0.0.1") != "127.0.0.1":
+        new_argv.extend(["--host", args.host])
     if args.config:
         new_argv.extend(["--config", args.config])
     if args.no_network:

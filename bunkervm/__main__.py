@@ -65,6 +65,14 @@ def main():
         help="Port for SSE transport (default: 3000)",
     )
     parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help=(
+            "Bind address for SSE transport and dashboard (default: 127.0.0.1). "
+            "The server is unauthenticated — only widen this on a trusted network."
+        ),
+    )
+    parser.add_argument(
         "--config",
         default=None,
         help="Path to bunkervm.toml config file",
@@ -244,7 +252,13 @@ def main():
     from .mcp_server import create_server, set_globals
 
     set_globals(client=client, audit=audit, vm_manager=vm, config=config)
-    server = create_server(port=args.port, host="0.0.0.0")
+    server = create_server(port=args.port, host=args.host)
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        logger.warning(
+            "MCP server bound to %s with no authentication — every tool, "
+            "including sandbox_exec, is reachable from that address.",
+            args.host,
+        )
 
     logger.info("BunkerVM MCP server ready (transport: %s)", args.transport)
     audit.log("server_ready", transport=args.transport)
@@ -254,11 +268,13 @@ def main():
         from .dashboard import DashboardServer
 
         dash_port = args.dashboard_port or (args.port + 1)
-        dashboard = DashboardServer(client, audit, vm, port=dash_port, config=config)
+        dashboard = DashboardServer(
+            client, audit, vm, port=dash_port, config=config, host=args.host
+        )
         dashboard.start()
 
     if args.transport == "sse":
-        logger.info("SSE endpoint: http://0.0.0.0:%d/sse", args.port)
+        logger.info("SSE endpoint: http://%s:%d/sse", args.host, args.port)
         server.run(transport="sse")
     else:
         server.run(transport="stdio")

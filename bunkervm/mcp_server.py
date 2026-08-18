@@ -52,8 +52,13 @@ def _get_audit():
     return _audit
 
 
-def create_server(port: int = 8000, host: str = "0.0.0.0") -> FastMCP:
-    """Create and return the configured MCP server instance."""
+def create_server(port: int = 8000, host: str = "127.0.0.1") -> FastMCP:
+    """Create and return the configured MCP server instance.
+
+    Binds loopback by default. The MCP server has no authentication, so
+    exposing it on 0.0.0.0 hands every tool — including sandbox_exec — to
+    anyone who can reach the port. Pass host explicitly to opt into that.
+    """
     mcp.settings.port = port
     mcp.settings.host = host
     return mcp

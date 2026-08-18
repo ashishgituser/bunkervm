@@ -591,30 +591,41 @@ class DashboardServer:
         audit: AuditLogger instance
         vm_manager: VMManager instance (optional)
         port: HTTP port (default: 3000)
+        host: Bind address (default: 127.0.0.1 — the dashboard is unauthenticated)
         pool: VMPool instance (optional, for multi-VM)
         config: BunkerVMConfig instance (optional, for resource info)
     """
 
-    def __init__(self, client, audit, vm_manager=None, port: int = 3000, pool=None, config=None):
+    def __init__(
+        self,
+        client,
+        audit,
+        vm_manager=None,
+        port: int = 3000,
+        pool=None,
+        config=None,
+        host: str = "127.0.0.1",
+    ):
         DashboardHandler._client = client
         DashboardHandler._audit = audit
         DashboardHandler._vm_manager = vm_manager
         DashboardHandler._pool = pool
         DashboardHandler._config = config
         self._port = port
+        self._host = host
         self._server: Optional[HTTPServer] = None
         self._thread: Optional[threading.Thread] = None
 
     def start(self):
         """Start the dashboard server in a background thread."""
-        self._server = ThreadingHTTPServer(("0.0.0.0", self._port), DashboardHandler)
+        self._server = ThreadingHTTPServer((self._host, self._port), DashboardHandler)
         self._thread = threading.Thread(
             target=self._server.serve_forever,
             daemon=True,
             name="bunkervm-dashboard",
         )
         self._thread.start()
-        logger.info("Dashboard: http://localhost:%d/dashboard", self._port)
+        logger.info("Dashboard: http://%s:%d/dashboard", self._host, self._port)
 
     def stop(self):
         """Stop the dashboard server."""

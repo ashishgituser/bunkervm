@@ -436,7 +436,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security
 
-See [SECURITY.md](SECURITY.md).
+See [SECURITY.md](SECURITY.md). The MCP server is unauthenticated and binds
+`127.0.0.1` by default — see [PRIVACY.md](PRIVACY.md) before widening it.
+
+## Privacy
+
+No telemetry, no accounts, no backend. Everything stays on your machine.
+See [PRIVACY.md](PRIVACY.md).
 
 ## License
 

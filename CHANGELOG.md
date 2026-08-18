@@ -2,6 +2,23 @@
 
 All notable changes to BunkerVM are documented here.
 
+## 0.14.0 — 2026-08-18
+
+### Security
+
+- **The MCP server and dashboard now bind `127.0.0.1` by default, not `0.0.0.0`.**
+  Both are unauthenticated. Binding every interface meant anything that could
+  route to the port could call `sandbox_exec` — the VM was isolated from the
+  host, but the door to it was open to the network. Pass `--host 0.0.0.0` to opt
+  back in; the server logs a warning when you do.
+
+### Added
+
+- `PRIVACY.md` — no telemetry, no accounts, no backend; documents what is stored
+  on disk and the only two outbound connections BunkerVM makes. Required by the
+  Claude and OpenAI MCP directories.
+- `--host` on `bunkervm server` and the legacy entrypoint.
+
 ## [Unreleased]
 
 ## [0.13.4] — 2026-08-18

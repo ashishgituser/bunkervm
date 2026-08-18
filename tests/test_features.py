@@ -1757,3 +1757,80 @@ class TestMCPToolAnnotations:
             a = tool.annotations
             if a.readOnlyHint:
                 assert a.destructiveHint is False, name
+
+
+# ── Bind Address Tests ──
+
+
+class TestServerBindsLoopbackByDefault:
+    """The MCP server and dashboard are unauthenticated. Binding anything
+    other than loopback hands sandbox_exec to the whole network, so the
+    default must stay 127.0.0.1 and widening it must be explicit."""
+
+    def test_create_server_defaults_to_loopback(self):
+        import inspect
+
+        from bunkervm.mcp_server import create_server
+
+        assert inspect.signature(create_server).parameters["host"].default == "127.0.0.1"
+
+    def test_create_server_honours_explicit_host(self):
+        from bunkervm.mcp_server import create_server
+
+        server = create_server(port=3000, host="0.0.0.0")
+        assert server.settings.host == "0.0.0.0"
+        create_server(port=3000, host="127.0.0.1")  # restore module-level state
+
+    def test_dashboard_defaults_to_loopback(self):
+        import inspect
+
+        from bunkervm.dashboard import DashboardServer
+
+        assert inspect.signature(DashboardServer).parameters["host"].default == "127.0.0.1"
+
+    def test_dashboard_binds_the_host_it_was_given(self):
+        from bunkervm.dashboard import DashboardServer
+
+        dash = DashboardServer(MagicMock(), MagicMock(), port=3999, host="127.0.0.1")
+        with patch("bunkervm.dashboard.ThreadingHTTPServer") as srv:
+            dash.start()
+        assert srv.call_args[0][0] == ("127.0.0.1", 3999)
+
+    def test_server_subcommand_exposes_host(self, capsys):
+        import sys
+
+        from bunkervm.cli import main
+
+        with patch.object(sys, "argv", ["bunkervm", "server", "--help"]):
+            with pytest.raises(SystemExit):
+                main()
+        assert "--host" in capsys.readouterr().out
+
+    def test_cmd_server_forwards_a_widened_host(self):
+        import argparse
+        import sys
+
+        from bunkervm.cli import cmd_server
+
+        base = dict(
+            transport="stdio", port=3000, config=None, no_network=False,
+            skip_vm=False, cpus=None, memory=None, dashboard=False,
+            dashboard_port=None, verbose=False,
+        )
+        captured = []
+        with patch("bunkervm.__main__.main", side_effect=lambda: captured.append(list(sys.argv))):
+            cmd_server(argparse.Namespace(host="0.0.0.0", **base))
+            cmd_server(argparse.Namespace(host="127.0.0.1", **base))
+
+        assert captured[0][captured[0].index("--host") + 1] == "0.0.0.0"
+        assert "--host" not in captured[1]
+
+    def test_no_module_hardcodes_a_wildcard_server_bind(self):
+        """cli.py may still choose 0.0.0.0 for the WSL engine bridge, but the
+        MCP server, dashboard and entrypoint must not hardcode it."""
+        import pathlib
+
+        root = pathlib.Path(__file__).resolve().parent.parent / "bunkervm"
+        for name in ("mcp_server.py", "dashboard.py", "__main__.py"):
+            src = (root / name).read_text(encoding="utf-8")
+            assert '"0.0.0.0"' not in src, name
